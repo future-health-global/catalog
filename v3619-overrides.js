@@ -1,7 +1,9 @@
-/* FUTURE HEALTH V36.19 — date UX / avatar layout / active series visibility */
+/* FUTURE HEALTH V36.20 — hotfix: restore single/batch share navigation + V36.19 refinements */
 (function(){
+  // Self-contained promo options: do not depend on a private function inside an older override.
+  function fh20PromoOptions(){return `<option value="none">Без акции</option><option value="buygift">Купить N — получить M в подарок</option><option value="discount">Скидка</option><option value="gift">Подарок к покупке</option><option value="special">Специальная цена</option><option value="custom">Другое / свой текст</option>`}
   function dateField(cls,label){return `<div class="fh19DateWrap"><input class="shareInput ${cls} fh19Date" type="text" inputmode="numeric" maxlength="8" placeholder="${label}: дд.мм.гг" autocomplete="off"><button type="button" class="fh19Cal" aria-label="Выбрать дату">▣</button><input class="fh19NativeDate" type="date" tabindex="-1" aria-hidden="true"></div>`}
-  window.promoControls=function(){return `<label style="margin-top:10px">Акция</label><select class="shareInput batchPromoPreset" onchange="fh16PromoChanged(this)">${promoOptions()}</select><div class="fh16PromoParams"></div><label style="margin-top:10px">Период акции</label><div class="fh19Period">${dateField('batchStart','От')}${dateField('batchEnd','До')}</div>`};
+  window.promoControls=function(){return `<label style="margin-top:10px">Акция</label><select class="shareInput batchPromoPreset" onchange="fh16PromoChanged(this)">${fh20PromoOptions()}</select><div class="fh16PromoParams"></div><label style="margin-top:10px">Период акции</label><div class="fh19Period">${dateField('batchStart','От')}${dateField('batchEnd','До')}</div>`};
 
   function digitsToDisplay(v){const d=String(v||'').replace(/\D/g,'').slice(0,6);return d.length<=2?d:d.length<=4?`${d.slice(0,2)}.${d.slice(2)}`:`${d.slice(0,2)}.${d.slice(2,4)}.${d.slice(4)}`}
   function isoToDisplay(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(v||''))return '';const [y,m,d]=v.split('-');return `${d}.${m}.${y.slice(-2)}`}
