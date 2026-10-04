@@ -135,7 +135,7 @@
     const rx=570,rw=420;let sx=meta.avatar?570:592,sy=by+58;
     // QR lives in the upper-right corner, has no caption, and is forced off for custom price.
     const showQr=meta.qr && cfg.priceMode!=='custom';
-    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};x.save();x.globalAlpha=.97;rr(866,112,144,144,18,'rgba(255,255,255,.97)',null);qrDraw(x,url,880,126,116);x.restore()}
+    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};x.save();x.globalAlpha=.97;rr(842,96,176,176,18,'rgba(255,255,255,.98)',null);qrDraw(x,url,856,110,148);x.restore()}
     if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,625,by+88,48);if(ok)sx=690}else{sx=592}
     x.fillStyle=V.a;x.font='900 19px Arial';x.fillText('ВАШ КОНСУЛЬТАНТ',sx,sy);sy+=39;
     if(meta.sender.length){meta.sender.slice(0,5).forEach((v,i)=>{x.fillStyle=i===0?'#102F36':'#294E58';x.font=`${i===0?'900':'700'} ${i===0?27:21}px Arial`;sy=drawWrapped(x,v,sx,sy,showQr?185:300,28,2)})}
