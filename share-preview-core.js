@@ -135,7 +135,7 @@
     const rx=570,rw=420;let sx=rx,sy=by+58;
     // QR lives in the upper-right corner, has no caption, and is forced off for custom price.
     const showQr=meta.qr && cfg.priceMode!=='custom';
-    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{}qrDraw(x,url,890,by+28,105)}
+    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};x.save();x.globalAlpha=.97;rr(875,165,135,135,22,'rgba(255,255,255,.96)',null);qrDraw(x,url,890,180,105);x.restore()}
     if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,625,by+88,48);if(ok)sx=690}
     x.fillStyle=V.a;x.font='900 19px Arial';x.fillText('ВАШ КОНСУЛЬТАНТ',sx,sy);sy+=39;
     if(meta.sender.length){meta.sender.slice(0,5).forEach((v,i)=>{x.fillStyle=i===0?'#102F36':'#294E58';x.font=`${i===0?'900':'700'} ${i===0?27:21}px Arial`;sy=drawWrapped(x,v,sx,sy,showQr?185:300,28,2)})}
