@@ -398,3 +398,6 @@ html,body{max-width:100%;overflow-x:hidden!important}
 
 /* V36.18 category series menu */
 .categoryHead>.fh18SeriesMenuBtn{width:44px;height:44px;display:grid;place-items:center;font-size:23px!important;line-height:1;color:var(--navy);letter-spacing:-2px;flex:0 0 44px}
+
+/* V36.19 */
+.fh19Period{display:grid;grid-template-columns:1fr;gap:9px;margin-top:7px}.fh19DateWrap{position:relative;min-width:0}.fh19DateWrap>.shareInput{width:100%;padding-right:52px}.fh19Cal{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:38px;border:0;border-left:1px solid #d9e5ee;background:transparent;color:#2b6598;font-size:20px;font-weight:800}.fh19NativeDate{position:absolute;width:1px;height:1px;opacity:0;right:8px;bottom:4px;pointer-events:none}.fh19Date::placeholder{color:#9aaab7;opacity:1}.categoryQuick{scroll-behavior:auto}

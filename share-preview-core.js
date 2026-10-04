@@ -61,9 +61,9 @@
   function cfgForIndex(index,id){
     try{
       if(document.querySelectorAll('#shareConfigShade .batchCfgRow[data-id]').length && typeof readBatchConfigs==='function'){
-        const all=readBatchConfigs(); const row=all.find(c=>c.id===id)||all[index]||{}; let pref={}; try{pref=typeof loadSharePrefs==='function'?(loadSharePrefs()||{}):{}}catch{} return {...pref,...row,avatar:row.avatar||pref.avatar||'',showQR:row.showQR!==undefined?row.showQR:(pref.showQR!==false)};
+        const all=readBatchConfigs(); const row=all.find(c=>c.id===id)||all[index]||{}; let pref={}; try{pref=typeof loadSharePrefs==='function'?(loadSharePrefs()||{}):{}}catch{} return {...pref,...row,avatar:row.showAvatar===false?'':(row.avatar!==undefined?row.avatar:(pref.showAvatar===false?'':(pref.avatar||''))),showAvatar:row.showAvatar!==undefined?row.showAvatar:(pref.showAvatar!==false),showQR:row.showQR!==undefined?row.showQR:(pref.showQR!==false)};
       }
-      if(typeof readShareConfig==='function'){ const row=readShareConfig()||{}; let pref={}; try{pref=typeof loadSharePrefs==='function'?(loadSharePrefs()||{}):{}}catch{} return {...pref,...row,avatar:row.avatar||pref.avatar||'',showQR:row.showQR!==undefined?row.showQR:(pref.showQR!==false)}; }
+      if(typeof readShareConfig==='function'){ const row=readShareConfig()||{}; let pref={}; try{pref=typeof loadSharePrefs==='function'?(loadSharePrefs()||{}):{}}catch{} return {...pref,...row,avatar:row.showAvatar===false?'':(row.avatar!==undefined?row.avatar:(pref.showAvatar===false?'':(pref.avatar||''))),showAvatar:row.showAvatar!==undefined?row.showAvatar:(pref.showAvatar!==false),showQR:row.showQR!==undefined?row.showQR:(pref.showQR!==false)}; }
     }catch(e){console.warn('[FH cfg]',e)}
     return {};
   }
@@ -71,7 +71,7 @@
     let prices=[];try{prices=typeof sharePriceLines==='function'?sharePriceLines(p,cfg):[]}catch{}
     let sender=[];try{sender=typeof senderLines==='function'?senderLines(cfg):[]}catch{}
     let period='';try{period=typeof offerPeriod==='function'?offerPeriod(cfg):''}catch{}
-    return {prices,sender,period,promo:String(cfg?.promo||'').trim(),qr:cfg?.showQR!==false,avatar:cfg?.avatar||'',crop:cfg?.avatarCrop||window.shareAvatarCrop||{scale:1,x:0,y:0}};
+    return {prices,sender,period,promo:String(cfg?.promo||'').trim(),qr:cfg?.showQR!==false,avatar:cfg?.showAvatar===false?'':(cfg?.avatar||''),crop:cfg?.avatarCrop||window.shareAvatarCrop||{scale:1,x:0,y:0}};
   }
   async function drawAvatar(ctx,data,crop,cx,cy,r){if(!data)return false;try{const im=await loadImage(data);ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();const base=Math.max((2*r)/im.width,(2*r)/im.height),sc=base*Math.max(1,Number(crop?.scale)||1),w=im.width*sc,h=im.height*sc;const k=(2*r)/230;ctx.drawImage(im,cx-w/2+(Number(crop?.x)||0)*k,cy-h/2+(Number(crop?.y)||0)*k,w,h);ctx.restore();return true}catch{return false}}
   function qrDraw(ctx,text,x,y,size){try{if(typeof drawQrToCanvas==='function')return drawQrToCanvas(ctx,text,x,y,size);return 0}catch{return 0}}
@@ -132,11 +132,11 @@
     if(meta.period){x.fillStyle='#506C76';x.font='700 19px Arial';drawWrapped(x,meta.period,lx,ly+8,lw,25,1)}
 
     // RIGHT 50% — identity. Avatar/name/phone never move left when commercial fields are empty.
-    const rx=570,rw=420;let sx=rx,sy=by+58;
+    const rx=570,rw=420;let sx=meta.avatar?570:592,sy=by+58;
     // QR lives in the upper-right corner, has no caption, and is forced off for custom price.
     const showQr=meta.qr && cfg.priceMode!=='custom';
-    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};x.save();x.globalAlpha=.97;rr(875,165,135,135,22,'rgba(255,255,255,.96)',null);qrDraw(x,url,890,180,105);x.restore()}
-    if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,625,by+88,48);if(ok)sx=690}
+    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};x.save();x.globalAlpha=.97;rr(866,112,144,144,18,'rgba(255,255,255,.97)',null);qrDraw(x,url,880,126,116);x.restore()}
+    if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,625,by+88,48);if(ok)sx=690}else{sx=592}
     x.fillStyle=V.a;x.font='900 19px Arial';x.fillText('ВАШ КОНСУЛЬТАНТ',sx,sy);sy+=39;
     if(meta.sender.length){meta.sender.slice(0,5).forEach((v,i)=>{x.fillStyle=i===0?'#102F36':'#294E58';x.font=`${i===0?'900':'700'} ${i===0?27:21}px Arial`;sy=drawWrapped(x,v,sx,sy,showQr?185:300,28,2)})}
     // footer
