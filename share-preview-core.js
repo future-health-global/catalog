@@ -61,9 +61,9 @@
   function cfgForIndex(index,id){
     try{
       if(document.querySelectorAll('#shareConfigShade .batchCfgRow[data-id]').length && typeof readBatchConfigs==='function'){
-        const all=readBatchConfigs(); return all.find(c=>c.id===id)||all[index]||{};
+        const all=readBatchConfigs(); const row=all.find(c=>c.id===id)||all[index]||{}; let pref={}; try{pref=typeof loadSharePrefs==='function'?(loadSharePrefs()||{}):{}}catch{} return {...pref,...row,avatar:row.avatar||pref.avatar||'',showQR:row.showQR!==undefined?row.showQR:(pref.showQR!==false)};
       }
-      if(typeof readShareConfig==='function') return readShareConfig()||{};
+      if(typeof readShareConfig==='function'){ const row=readShareConfig()||{}; let pref={}; try{pref=typeof loadSharePrefs==='function'?(loadSharePrefs()||{}):{}}catch{} return {...pref,...row,avatar:row.avatar||pref.avatar||'',showQR:row.showQR!==undefined?row.showQR:(pref.showQR!==false)}; }
     }catch(e){console.warn('[FH cfg]',e)}
     return {};
   }
@@ -76,32 +76,61 @@
   async function drawAvatar(ctx,data,crop,cx,cy,r){if(!data)return false;try{const im=await loadImage(data);ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();const base=Math.max((2*r)/im.width,(2*r)/im.height),sc=base*Math.max(1,Number(crop?.scale)||1),w=im.width*sc,h=im.height*sc;const k=(2*r)/230;ctx.drawImage(im,cx-w/2+(Number(crop?.x)||0)*k,cy-h/2+(Number(crop?.y)||0)*k,w,h);ctx.restore();return true}catch{return false}}
   function qrDraw(ctx,text,x,y,size){try{if(typeof drawQrToCanvas==='function')return drawQrToCanvas(ctx,text,x,y,size);return 0}catch{return 0}}
   async function card(p,index=0,cfg={}){
-    const W=1080,H=1920,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
-    const tpl=selectedTemplate(index),colorKey=selectedColor(index),cs=COLOR_SCHEMES[colorKey]||COLOR_SCHEMES.blue,accent=cs.accent;bg(x,tpl,colorKey,W,H);
+    // V36.14: 1080x1920 logical layout rendered at 1.5x for a 1620x2880 HD PNG.
+    const W=1080,H=1920,S=1.5,c=document.createElement('canvas');c.width=W*S;c.height=H*S;const x=c.getContext('2d');x.scale(S,S);
+    const tpl=selectedTemplate(index),colorKey=selectedColor(index);
+    const vivid={blue:{a:'#073B78',b:'#00A7D8',hot:'#F2B84B',soft:'#E8F7FF'},green:{a:'#064E3B',b:'#22A06B',hot:'#F5B942',soft:'#EAF9EF'},turquoise:{a:'#005F63',b:'#00B8A9',hot:'#FFB547',soft:'#E5FFFB'},violet:{a:'#4A2478',b:'#A63FD4',hot:'#FFB24A',soft:'#F5EAFE'},warm:{a:'#9B3F18',b:'#F0782B',hot:'#F5C84C',soft:'#FFF0E4'}};
+    const V=vivid[colorKey]||vivid.blue,accent=V.a;
     const summary=(()=>{try{return typeof officialShareSummary==='function'?officialShareSummary(p):''}catch{return ''}})(),feats=featuresFor(p),meta=metaLines(p,cfg);
     let im=null;try{const src=imgSrc(p);if(src)im=await loadImage(src)}catch{}
-    const hasCommercial=meta.prices.length||meta.promo||meta.period,hasContact=meta.sender.length||meta.avatar||meta.qr,hasMeta=hasCommercial||hasContact;
-    const logo=()=>{x.fillStyle=accent;x.font='700 43px Arial';x.fillText('FUTURE HEALTH',68,92);x.fillStyle='#718696';x.font='500 19px Arial';x.fillText('КАТАЛОГ ПРОДУКЦИИ',70,122)};
-    const fit=(bx,by,bw,bh,cover=false)=>{if(!im)return;rounded(x,bx,by,bw,bh,30,'rgba(255,255,255,.78)',null);x.save();x.beginPath();x.roundRect(bx,by,bw,bh,30);x.clip();const r=cover?Math.max(bw/im.width,bh/im.height):Math.min(bw/im.width,bh/im.height),w=im.width*r,h=im.height*r;x.drawImage(im,bx+(bw-w)/2,by+(bh-h)/2,w,h);x.restore()};
-    const title=(text,xx,yy,mw,size=40,lines=4)=>{x.fillStyle='#17374f';x.font=`700 ${size}px Arial`;return drawWrapped(x,text,xx,yy,mw,Math.round(size*1.25),lines)};
-    const para=(text,xx,yy,mw,lines=5,size=24)=>{x.fillStyle='#5d7484';x.font=`400 ${size}px Arial`;return drawWrapped(x,text,xx,yy,mw,Math.round(size*1.42),lines)};
-    const footer=()=>{x.strokeStyle='rgba(60,100,125,.18)';x.lineWidth=2;x.beginPath();x.moveTo(70,1865);x.lineTo(1010,1865);x.stroke();x.fillStyle=accent;x.font='700 20px Arial';x.fillText('FUTURE HEALTH · SHARE HAPPINESS',70,1900)};
-    const drawMeta=async(top)=>{if(!hasMeta)return top;let h=0;if(hasCommercial)h+=meta.prices.length*34+(meta.promo?66:0)+(meta.period?28:0)+30;if(hasContact)h=Math.max(h,220);h=Math.min(330,Math.max(150,h));const y=Math.min(top,1810-h);rounded(x,70,y,940,h,28,'rgba(255,255,255,.92)',null);x.strokeStyle=accent+'33';x.lineWidth=2;x.stroke();let ly=y+38;
-      if(hasCommercial){x.fillStyle=accent;x.font='700 25px Arial';meta.prices.forEach(v=>{x.fillText(v,96,ly);ly+=34});if(meta.promo){x.fillStyle='#294d68';x.font='700 21px Arial';ly=drawWrapped(x,meta.promo,96,ly+4,560,28,2)+4}if(meta.period){x.fillStyle='#718696';x.font='500 17px Arial';x.fillText(meta.period,96,ly+16)}}
-      if(hasContact){let sx=hasCommercial?650:96;if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,sx+58,y+92,52);if(ok)sx+=128}if(meta.sender.length){x.fillStyle='#718696';x.font='700 14px Arial';x.fillText('КОНТАКТ',sx,y+42);let sy=y+74;meta.sender.slice(0,5).forEach((v,i)=>{x.fillStyle=i===0?'#17374f':'#496a84';x.font=`${i===0?'700':'500'} ${i===0?20:17}px Arial`;sy=drawWrapped(x,v,sx,sy,meta.qr?245:330,23,1)})}if(meta.qr){let url='';try{url=productDeepLink(p.id)}catch{}const q=qrDraw(x,url,830,y+34,130);if(q){x.fillStyle='#718696';x.font='500 13px Arial';x.fillText('Подробнее',845,y+182)}}}
-      return y+h;
-    };
-    if(tpl==='classic'){
-      logo();fit(82,155,916,hasMeta?555:690,false);let y=title(p?.name||'Продукт',70,hasMeta?775:945,940,hasMeta?36:39,4);y=para(summary,70,y+12,940,hasMeta?3:4,hasMeta?22:24);x.fillStyle=accent;x.font='700 19px Arial';x.fillText('КЛЮЧЕВЫЕ ОСОБЕННОСТИ',70,y+22);y+=48;feats.forEach((f,i)=>{const yy=y+i*(hasMeta?84:108);rounded(x,70,yy,940,hasMeta?68:88,22,'rgba(255,255,255,.82)',null);x.fillStyle=accent;x.font='700 20px Arial';x.fillText(String(i+1).padStart(2,'0'),94,yy+(hasMeta?41:51));x.fillStyle='#304c5d';x.font=`600 ${hasMeta?18:21}px Arial`;drawWrapped(x,f,145,yy+(hasMeta?30:38),825,25,2)});await drawMeta(y+3*(hasMeta?84:108)+20);footer();
+    // vivid premium background
+    const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,V.soft);g.addColorStop(.48,'#fff');g.addColorStop(1,V.soft);x.fillStyle=g;x.fillRect(0,0,W,H);
+    x.globalAlpha=.10;x.fillStyle=V.b;x.beginPath();x.arc(1030,230,300,0,Math.PI*2);x.fill();x.beginPath();x.arc(-80,1320,260,0,Math.PI*2);x.fill();x.globalAlpha=1;
+    drawLeaf(x,65,360,85,210,-.55,V.a,.15);drawLeaf(x,1015,1210,70,180,.55,V.b,.12);
+    // decorative dots / lines
+    x.fillStyle=V.hot;for(let i=0;i<5;i++){x.globalAlpha=.75-i*.1;x.beginPath();x.arc(915+i*25,118+i*8,7-i*.6,0,Math.PI*2);x.fill()}x.globalAlpha=1;
+    const rr=(bx,by,bw,bh,r,fill,stroke)=>{rounded(x,bx,by,bw,bh,r,fill,stroke)};
+    const fit=(bx,by,bw,bh,cover=false)=>{if(!im)return;rr(bx,by,bw,bh,30,'#fff',null);x.save();x.beginPath();x.roundRect(bx,by,bw,bh,30);x.clip();const r=cover?Math.max(bw/im.width,bh/im.height):Math.min(bw/im.width,bh/im.height),w=im.width*r,h=im.height*r;x.drawImage(im,bx+(bw-w)/2,by+(bh-h)/2,w,h);x.restore()};
+    const text=(t,xx,yy,mw,size,weight,color,lines,lh=1.22)=>{x.fillStyle=color;x.font=`${weight} ${size}px Arial`;return drawWrapped(x,t,xx,yy,mw,Math.round(size*lh),lines)};
+    // header
+    x.fillStyle=V.a;x.font='800 44px Arial';x.fillText('FUTURE HEALTH',70,84);x.fillStyle=V.b;x.font='700 18px Arial';x.fillText('КАТАЛОГ ПРОДУКЦИИ',72,116);x.strokeStyle=V.hot;x.lineWidth=5;x.beginPath();x.moveTo(72,134);x.lineTo(170,134);x.stroke();
+    // Layouts remain genuinely different, but all use large readable type and same fixed bottom info architecture.
+    if(tpl==='info'){
+      rr(55,170,410,1190,34,'rgba(255,255,255,.78)',null);x.fillStyle=V.a;x.font='800 18px Arial';x.fillText('ПРОДУКТ · КРАТКО',82,215);
+      let y=text(p?.name||'Продукт',82,270,350,43,'800','#102F36',7,1.18);y=text(summary,82,y+24,350,29,'500','#355864',9,1.42);
+      fit(500,180,525,520,false);x.fillStyle=V.a;x.font='800 23px Arial';x.fillText('КЛЮЧЕВЫЕ ОСОБЕННОСТИ',500,755);
+      feats.forEach((f,i)=>{const yy=795+i*155;rr(500,yy,525,128,26,'rgba(255,255,255,.92)',null);rr(520,yy+28,62,62,18,V.a,null);x.fillStyle='#fff';x.font='800 26px Arial';x.textAlign='center';x.fillText(String(i+1),551,yy+70);x.textAlign='left';text(f,604,yy+42,390,27,'700','#244652',3,1.22)});
     } else if(tpl==='visual'){
-      fit(0,0,W,hasMeta?760:1030,true);const gy=hasMeta?380:530,gh=hasMeta?500:620,grad=x.createLinearGradient(0,gy,0,gy+gh);grad.addColorStop(0,'rgba(10,30,45,0)');grad.addColorStop(1,'rgba(10,30,45,.82)');x.fillStyle=grad;x.fillRect(0,gy,W,gh);x.fillStyle='#fff';x.font=`700 ${hasMeta?42:48}px Arial`;drawWrapped(x,p?.name||'Продукт',70,hasMeta?625:855,940,55,4);const cy=hasMeta?820:1110,ch=hasMeta?410:500;rounded(x,70,cy,940,ch,34,'rgba(255,255,255,.91)',null);x.fillStyle=accent;x.font='700 19px Arial';x.fillText('3 КЛЮЧЕВЫХ АКЦЕНТА',105,cy+48);const cw=280;feats.forEach((f,i)=>{const xx=105+i*300;rounded(x,xx,cy+78,cw,ch-125,26,cs.soft,null);x.fillStyle=accent;x.font='700 30px Arial';x.fillText('0'+(i+1),xx+24,cy+126);x.fillStyle='#304c5d';x.font=`600 ${hasMeta?18:22}px Arial`;drawWrapped(x,f,xx+24,cy+172,cw-48,27,hasMeta?4:5)});await drawMeta(cy+ch+25);footer();
-    } else if(tpl==='info'){
-      logo();x.fillStyle=accent;x.font='700 19px Arial';x.fillText('ПРОДУКТ · КРАТКО',70,195);let y=title(p?.name||'Продукт',70,245,390,hasMeta?34:38,6);para(summary,70,y+14,390,hasMeta?5:8,21);fit(500,170,510,hasMeta?500:610,false);x.fillStyle=accent;x.font='700 20px Arial';x.fillText('КЛЮЧЕВЫЕ ОСОБЕННОСТИ',500,hasMeta?710:850);feats.forEach((f,i)=>{const yy=(hasMeta?745:890)+i*(hasMeta?118:150);rounded(x,500,yy,510,hasMeta?96:122,22,'rgba(255,255,255,.84)',null);rounded(x,520,yy+18,52,52,16,accent,null);x.fillStyle='#fff';x.font='700 20px Arial';x.textAlign='center';x.fillText(String(i+1),546,yy+53);x.textAlign='left';x.fillStyle='#304c5d';x.font=`600 ${hasMeta?18:21}px Arial`;drawWrapped(x,f,592,yy+36,390,25,3)});await drawMeta(hasMeta?1140:1370);footer();
+      fit(55,165,970,650,true);const gr=x.createLinearGradient(0,450,0,815);gr.addColorStop(0,'rgba(0,25,30,0)');gr.addColorStop(1,'rgba(0,25,30,.80)');x.fillStyle=gr;x.fillRect(55,410,970,405);text(p?.name||'Продукт',90,650,900,47,'800','#fff',4,1.16);
+      rr(55,845,970,500,34,'rgba(255,255,255,.94)',null);x.fillStyle=V.a;x.font='800 23px Arial';x.fillText('3 КЛЮЧЕВЫХ АКЦЕНТА',90,900);feats.forEach((f,i)=>{const xx=88+i*310;rr(xx,930,285,350,26,i===1?V.soft:'#fff',null);x.fillStyle=i===1?V.b:V.a;x.font='800 38px Arial';x.fillText('0'+(i+1),xx+24,988);text(f,xx+24,1035,237,28,'700','#244652',6,1.25)});
+    } else if(tpl==='minimal'){
+      x.fillStyle=V.a;x.font='700 19px Arial';x.fillText('01 / PRODUCT',70,215);let y=text(p?.name||'Продукт',70,285,580,52,'800','#102F36',5,1.14);x.strokeStyle=V.hot;x.lineWidth=7;x.beginPath();x.moveTo(70,y+12);x.lineTo(250,y+12);x.stroke();fit(675,215,335,455,false);text(summary,70,850,940,31,'500','#355864',6,1.38);x.fillStyle=V.a;x.font='800 22px Arial';x.fillText('КЛЮЧЕВОЕ',70,1110);feats.forEach((f,i)=>{const yy=1160+i*92;x.fillStyle=i===0?V.hot:V.b;x.beginPath();x.arc(88,yy-10,10,0,Math.PI*2);x.fill();text(f,125,yy,850,29,'700','#244652',2,1.22)});
     } else {
-      logo();x.fillStyle=accent;x.font='500 20px Arial';x.fillText('01 / PRODUCT',70,300);let y=title(p?.name||'Продукт',70,365,560,hasMeta?44:52,5);x.strokeStyle=accent;x.lineWidth=5;x.beginPath();x.moveTo(70,y+20);x.lineTo(240,y+20);x.stroke();fit(650,290,360,hasMeta?430:520,false);para(summary,70,hasMeta?830:960,940,hasMeta?4:6,23);x.fillStyle=accent;x.font='700 19px Arial';x.fillText('КЛЮЧЕВОЕ',70,hasMeta?1060:1260);feats.forEach((f,i)=>{const yy=(hasMeta?1110:1320)+i*(hasMeta?78:105);x.fillStyle=accent;x.beginPath();x.arc(84,yy-8,7,0,Math.PI*2);x.fill();x.fillStyle='#304c5d';x.font=`600 ${hasMeta?20:25}px Arial`;drawWrapped(x,f,115,yy,820,29,2)});await drawMeta(hasMeta?1370:1660);footer();
+      // premium editorial / botanical default
+      fit(70,165,940,590,false);rr(70,715,250,54,27,V.a,null);x.fillStyle='#fff';x.font='800 20px Arial';x.fillText('FUTURE HEALTH',95,750);
+      let y=text(p?.name||'Продукт',70,835,940,48,'800','#102F36',4,1.16);y=text(summary,70,y+22,940,31,'500','#355864',5,1.38);
+      x.fillStyle=V.a;x.font='800 23px Arial';x.fillText('КЛЮЧЕВЫЕ ОСОБЕННОСТИ',70,y+38);const fy=y+70;feats.forEach((f,i)=>{const xx=70+i*315;rr(xx,fy,295,205,26,'rgba(255,255,255,.94)',null);x.fillStyle=[V.a,V.b,V.hot][i];x.beginPath();x.arc(xx+42,fy+45,24,0,Math.PI*2);x.fill();x.fillStyle=i===2?'#573800':'#fff';x.font='800 22px Arial';x.textAlign='center';x.fillText(String(i+1),xx+42,fy+53);x.textAlign='left';text(f,xx+25,fy+95,245,27,'700','#244652',4,1.22)});
     }
-    return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('canvas blob')),'image/png',.94));
+    // FIXED BOTTOM BAR. It never reflows: commercial left, QR center, profile right.
+    const by=1585,bh=270;rr(55,by,970,bh,32,'rgba(255,255,255,.97)',null);x.strokeStyle=V.a+'33';x.lineWidth=2;x.stroke();
+    // vertical separators define immutable zones
+    x.strokeStyle='rgba(30,70,80,.14)';x.lineWidth=2;x.beginPath();x.moveTo(440,by+28);x.lineTo(440,by+bh-28);x.moveTo(650,by+28);x.lineTo(650,by+bh-28);x.stroke();
+    // LEFT 365px: price/PV/promo/period
+    let ly=by+48;x.fillStyle=V.a;x.font='800 20px Arial';x.fillText('ПРЕДЛОЖЕНИЕ',82,ly);ly+=40;
+    if(meta.prices.length){meta.prices.slice(0,2).forEach((v,i)=>{x.fillStyle=i===0?V.a:'#173D47';x.font=`800 ${i===0?31:27}px Arial`;ly=drawWrapped(x,v,82,ly,330,36,2)})}
+    if(meta.promo){x.fillStyle='#173D47';x.font='800 25px Arial';ly=drawWrapped(x,meta.promo,82,ly+5,330,31,2)}
+    if(meta.period){x.fillStyle='#506C76';x.font='600 20px Arial';drawWrapped(x,meta.period,82,ly+8,330,26,2)}
+    // CENTER 210px: QR only, always centered
+    if(meta.qr){let url='';try{url=productDeepLink(p.id)}catch{}const q=qrDraw(x,url,468,by+48,155);if(q){x.fillStyle=V.a;x.font='700 16px Arial';x.textAlign='center';x.fillText('ПОДРОБНЕЕ',545,by+230);x.textAlign='left'}}
+    // RIGHT 355px: avatar + profile only
+    let sx=680, sy=by+48;if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,735,by+92,48);if(ok)sx=800}
+    x.fillStyle=V.a;x.font='800 18px Arial';x.fillText('ВАШ КОНСУЛЬТАНТ',sx,sy);sy+=38;
+    if(meta.sender.length){meta.sender.slice(0,5).forEach((v,i)=>{x.fillStyle=i===0?'#102F36':'#294E58';x.font=`${i===0?'800':'600'} ${i===0?28:23}px Arial`;sy=drawWrapped(x,v,sx,sy,1000-sx,29,1)})}
+    // footer
+    x.strokeStyle='rgba(30,70,80,.18)';x.beginPath();x.moveTo(70,1880);x.lineTo(1010,1880);x.stroke();x.fillStyle=V.a;x.font='800 18px Arial';x.fillText('FUTURE HEALTH · SHARE HAPPINESS',70,1910);
+    return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('canvas blob')),'image/png'));
   }
+
   function idsFromConfig(){
     const rows=[...document.querySelectorAll('#shareConfigShade .batchCfgRow[data-id]')].map(n=>n.dataset.id).filter(Boolean);if(rows.length)return rows.slice(0,5);
     try{if(typeof shareDraft!=='undefined'&&shareDraft?.id)return [shareDraft.id]}catch{}
