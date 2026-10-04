@@ -395,3 +395,6 @@ html,body{max-width:100%;overflow-x:hidden!important}
 .batchCfgRow .shareInline,.fhSingleCommercial .shareInline{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:7px!important;width:100%!important;max-width:100%!important}.batchCfgRow .shareInline .shareInput,.fhSingleCommercial .shareInline .shareInput{width:100%!important;min-width:0!important;padding-left:8px!important;padding-right:5px!important;font-size:13px!important}
 .batchCfgRow,.fhSingleCommercial,.fh17VisualSection{min-width:0;overflow:hidden}.fh17VisualSection{margin-top:16px;padding-top:4px;border-top:1px solid #e7eff5}
 @media(max-width:390px){.batchCfgRow .shareInline,.fhSingleCommercial .shareInline{grid-template-columns:1fr!important}.batchCfgRow .shareInline .shareInput,.fhSingleCommercial .shareInline .shareInput{font-size:14px!important}}
+
+/* V36.18 category series menu */
+.categoryHead>.fh18SeriesMenuBtn{width:44px;height:44px;display:grid;place-items:center;font-size:23px!important;line-height:1;color:var(--navy);letter-spacing:-2px;flex:0 0 44px}
