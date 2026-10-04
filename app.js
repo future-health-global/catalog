@@ -856,3 +856,60 @@ async function richShareCard(p,cfg){const W=1080,H=1920,c=document.createElement
  const sender=senderLines(cfg),hasSender=sender.length||cfg.avatar;const qrOn=cfg.showQR!==false;const bottomY=1585;if(hasSender||qrOn){x.fillStyle='#fff';roundRect(x,70,bottomY,940,265,24);x.strokeStyle='#d8e8f3';x.lineWidth=2;x.stroke();let sx=96;if(cfg.avatar){const ok=await drawAvatarCircle(x,cfg.avatar,150,bottomY+112,62);if(ok)sx=235}if(sender.length){x.fillStyle='#70889b';x.font='700 16px Arial';x.fillText('КОНТАКТ',sx,bottomY+48);let sy=bottomY+82;sender.slice(0,5).forEach((s,i)=>{x.font=(i===0?'700 24px':'500 20px')+' Arial';x.fillStyle=i===0?P[3]:'#496a84';x.fillText(s,sx,sy);sy+=30})}if(qrOn){const qs=drawQrToCanvas(x,productDeepLink(p.id),810,bottomY+48,155);if(qs){x.fillStyle='#627d92';x.font='500 14px Arial';x.fillText('Подробнее',820,bottomY+222)}}}
  if(cfg.priceMode==='custom'||cfg.promo){x.fillStyle='#8296a6';x.font='400 15px Arial';x.fillText('Условия предложения устанавливаются продавцом.',70,1850)}x.fillStyle=P[2];x.fillRect(70,1888,940,3);return await new Promise(res=>c.toBlob(res,'image/png',.95))}
 makeProductCard=richShareCard;
+
+/* ===== V36.15 — SINGLE SOURCE PROFILE + BATCH DATA FIX ===== */
+(function(){
+  const oldShareBasePrefs=shareBasePrefs;
+  shareBasePrefs=function(){const p=oldShareBasePrefs();return {...p,showAvatar:p.showAvatar!==false};};
+
+  // Publication profile owns identity/avatar only. No template/color/QR here.
+  openShareProfileSettings=function(){
+    const pref=shareBasePrefs(); shareAvatarData=pref.avatar||'';
+    const d=document.createElement('div');d.id='shareConfigShade';d.className='shareConfigShade';
+    d.innerHTML=`<div class="shareConfigSheet"><div class="shareConfigHead"><div><small>FUTURE HEALTH</small><b>Мои данные для публикаций</b></div><button onclick="closeShareConfig()">×</button></div>
+      ${senderFieldsHtml(pref)}
+      <div class="shareField"><label class="shareToggle"><span><b>Показывать фото</b><small>Фото отображается только если оно загружено</small></span><input id="shareShowAvatar" type="checkbox" ${pref.showAvatar!==false?'checked':''}></label>
+        <div class="shareAvatarRow" style="margin-top:10px"><div id="shareAvatarPreview" class="shareAvatarPreview">Без фото</div><div><input id="shareAvatarInput" type="file" accept="image/*" class="shareInput"><button type="button" class="secondary" style="margin-top:7px;padding:8px 10px;border-radius:10px;background:#eef5fa" onclick="clearShareAvatar()">Удалить фото</button></div></div></div>
+      <div class="shareConfigActions"><button class="secondary" onclick="closeShareConfig()">Отмена</button><button class="primary" onclick="saveShareProfileOnly()">Сохранить</button></div></div>`;
+    document.body.appendChild(d);bindShareInputs(d);bindAvatar(d);const cb=d.querySelector('#shareSaveDefaults');if(cb)cb.closest('label').style.display='none';
+  };
+  saveShareProfileOnly=function(){
+    const cfg=readSenderFields({});const raw=String(document.getElementById('shareSenderPhone')?.value||'').replace(/\D/g,'');
+    if(raw && !(raw.length===11&&(raw[0]==='7'||raw[0]==='8'))){showShareToast('Проверьте телефон','Нужно ровно 11 цифр, первая — 7 или 8');return}
+    const old=loadSharePrefs()||{};saveSharePrefs({...old,senderStatus:cfg.senderStatus,senderName:cfg.senderName,senderPhone:raw,senderContacts:cfg.senderContacts||readContactRows(),avatar:shareAvatarData||'',showAvatar:!!document.getElementById('shareShowAvatar')?.checked});
+    closeShareConfig();showShareToast('Данные сохранены','Они автоматически используются в одиночной и пакетной публикации');
+  };
+
+  // Visual controls contain visual choices only — no duplicate profile fields.
+  shareVisualFieldsHtml=function(pref){return `${shareTemplateHtml(pref.template||'classic')}<input type="hidden" id="shareTemplate" value="${pref.template||'classic'}"><div class="shareField"><label class="shareToggle"><span><b>QR-код продукта</b><small>При своей цене QR отключается автоматически</small></span><input id="shareQR" type="checkbox" ${pref.showQR!==false?'checked':''}></label></div>`};
+
+  // Strict phone: digits only, exactly 11, starts with 7/8. Do not format with symbols.
+  const oldBind=bindShareInputs;
+  bindShareInputs=function(root=document){oldBind(root);const ph=root.querySelector('#shareSenderPhone');if(ph){ph.type='tel';ph.inputMode='numeric';ph.pattern='[78][0-9]{10}';ph.maxLength=11;ph.placeholder='7XXXXXXXXXX или 8XXXXXXXXXX';ph.value=String(ph.value||'').replace(/\D/g,'').slice(0,11);ph.onblur=null;ph.addEventListener('input',()=>{let v=ph.value.replace(/\D/g,'').slice(0,11);if(v && v[0]!=='7'&&v[0]!=='8')v='';ph.value=v})}};
+
+  // Merge saved identity into every single card; publication settings never override it with blanks.
+  const oldReadSingle=readShareConfig;
+  readShareConfig=function(){const c=oldReadSingle();if(!c)return c;const p=loadSharePrefs()||{};return {...c,senderStatus:p.senderStatus||'none',senderName:p.senderName||'',senderPhone:p.senderPhone||'',senderContacts:p.senderContacts||[],avatar:p.showAvatar===false?'':(p.avatar||''),showAvatar:p.showAvatar!==false,showQR:c.priceMode==='custom'?false:c.showQR};};
+
+  function promoOptions(){return `<option value="">Без акции</option><option value="buy2get1">Купи 2 — получи 1 в подарок</option><option value="buy3get1">Купи 3 — получи 1 в подарок</option><option value="buy4get1">Купи 4 — получи 1 в подарок</option><option value="discount">Скидка на продукт</option><option value="special">Специальное предложение</option><option value="custom">Другое / свой текст</option>`}
+  window.fhBatchPromoChanged=function(sel){const r=sel.closest('.batchCfgRow'),inp=r.querySelector('.batchPromoCustom');inp.classList.toggle('hidden',sel.value!=='custom');};
+  window.fhBatchPriceChanged=function(sel){const r=sel.closest('.batchCfgRow');r.querySelector('.batchPrice').classList.toggle('hidden',sel.value!=='custom');};
+  function batchPromoText(r){const v=r.querySelector('.batchPromoPreset')?.value||'';if(v==='custom')return (r.querySelector('.batchPromoCustom')?.value||'').trim();return ({buy2get1:'Купи 2 — получи 1 в подарок',buy3get1:'Купи 3 — получи 1 в подарок',buy4get1:'Купи 4 — получи 1 в подарок',discount:'Скидка на продукт',special:'Специальное предложение'})[v]||'';}
+
+  // Batch page: only per-product commercial data + shared visual design. Personal data comes from profile.
+  openBatchConfig=function(){
+    if(!batchSelected.length)return;closeBatchPicker();const pref=shareBasePrefs(),ps=batchSelected.map(id=>products.find(p=>p.id===id)).filter(Boolean);
+    const rows=ps.map(p=>`<div class="batchCfgRow shareField" data-id="${p.id}"><div class="batchCfgHead">${p.img?`<img src="${p.img}" alt="">`:''}<b>${p.name}</b></div>
+      <label>Цена</label><div class="batchMiniGrid"><select class="shareInput batchMode" onchange="fhBatchPriceChanged(this)"><option value="none">Без цены</option><option value="member">Для участников</option><option value="custom">Своя цена</option></select><input class="shareInput batchPrice hidden" inputmode="decimal" placeholder="Цена, ₽"><label class="batchPv"><input class="batchPV" type="checkbox"> PV</label></div>
+      <label style="margin-top:10px">Акция</label><select class="shareInput batchPromoPreset" onchange="fhBatchPromoChanged(this)">${promoOptions()}</select><input class="shareInput batchPromoCustom hidden" style="margin-top:8px" maxlength="100" placeholder="Введите свой текст акции">
+      <label style="margin-top:10px">Период акции</label><div class="shareInline"><input class="shareInput batchStart" type="date"><input class="shareInput batchEnd" type="date"></div></div>`).join('');
+    const d=document.createElement('div');d.id='shareConfigShade';d.className='shareConfigShade';d.innerHTML=`<div class="shareConfigSheet batchConfig"><div class="shareConfigHead"><div><small>FUTURE HEALTH</small><b>Пакет из ${ps.length} карточек</b></div><button onclick="closeShareConfig()">×</button></div><div class="shareHint batchHint">Цена, акция и период задаются отдельно для каждого продукта. Личные данные берутся из «Мои данные для публикаций».</div>${rows}${shareVisualFieldsHtml(pref)}<div class="shareConfigActions"><button class="secondary" onclick="closeShareConfig()">Отмена</button><button class="primary" onclick="previewBatchShare()">Предпросмотр</button></div></div>`;document.body.appendChild(d);bindShareInputs(d);
+  };
+
+  readBatchConfigs=function(){
+    const p=loadSharePrefs()||{};const t=document.getElementById('shareTemplate')?.value||'classic';const q=!!document.getElementById('shareQR')?.checked;
+    return [...document.querySelectorAll('.batchCfgRow[data-id]')].map((r,i)=>{const priceMode=r.querySelector('.batchMode')?.value||'none';return {id:r.dataset.id,priceMode,customPrice:(r.querySelector('.batchPrice')?.value||'').trim(),showPV:!!r.querySelector('.batchPV')?.checked,promo:batchPromoText(r),start:r.querySelector('.batchStart')?.value||'',end:r.querySelector('.batchEnd')?.value||'',senderStatus:p.senderStatus||'none',senderName:p.senderName||'',senderPhone:p.senderPhone||'',senderContacts:p.senderContacts||[],avatar:p.showAvatar===false?'':(p.avatar||''),showAvatar:p.showAvatar!==false,template:t==='auto'?['classic','visual','info','minimal'][i%4]:t,showQR:priceMode==='custom'?false:q};});
+  };
+
+  offerPeriod=function(cfg){if(cfg.start&&cfg.end)return `Действует с ${formatDateRu(cfg.start)} по ${formatDateRu(cfg.end)}`;if(cfg.end)return `Действует до ${formatDateRu(cfg.end)}`;if(cfg.start)return `Действует с ${formatDateRu(cfg.start)}`;return ''};
+})();

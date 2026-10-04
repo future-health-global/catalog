@@ -111,21 +111,34 @@
       let y=text(p?.name||'Продукт',70,835,940,48,'800','#102F36',4,1.16);y=text(summary,70,y+22,940,31,'500','#355864',5,1.38);
       x.fillStyle=V.a;x.font='800 23px Arial';x.fillText('КЛЮЧЕВЫЕ ОСОБЕННОСТИ',70,y+38);const fy=y+70;feats.forEach((f,i)=>{const xx=70+i*315;rr(xx,fy,295,205,26,'rgba(255,255,255,.94)',null);x.fillStyle=[V.a,V.b,V.hot][i];x.beginPath();x.arc(xx+42,fy+45,24,0,Math.PI*2);x.fill();x.fillStyle=i===2?'#573800':'#fff';x.font='800 22px Arial';x.textAlign='center';x.fillText(String(i+1),xx+42,fy+53);x.textAlign='left';text(f,xx+25,fy+95,245,27,'700','#244652',4,1.22)});
     }
-    // FIXED BOTTOM BAR. It never reflows: commercial left, QR center, profile right.
-    const by=1585,bh=270;rr(55,by,970,bh,32,'rgba(255,255,255,.97)',null);x.strokeStyle=V.a+'33';x.lineWidth=2;x.stroke();
-    // vertical separators define immutable zones
-    x.strokeStyle='rgba(30,70,80,.14)';x.lineWidth=2;x.beginPath();x.moveTo(440,by+28);x.lineTo(440,by+bh-28);x.moveTo(650,by+28);x.lineTo(650,by+bh-28);x.stroke();
-    // LEFT 365px: price/PV/promo/period
-    let ly=by+48;x.fillStyle=V.a;x.font='800 20px Arial';x.fillText('ПРЕДЛОЖЕНИЕ',82,ly);ly+=40;
-    if(meta.prices.length){meta.prices.slice(0,2).forEach((v,i)=>{x.fillStyle=i===0?V.a:'#173D47';x.font=`800 ${i===0?31:27}px Arial`;ly=drawWrapped(x,v,82,ly,330,36,2)})}
-    if(meta.promo){x.fillStyle='#173D47';x.font='800 25px Arial';ly=drawWrapped(x,meta.promo,82,ly+5,330,31,2)}
-    if(meta.period){x.fillStyle='#506C76';x.font='600 20px Arial';drawWrapped(x,meta.period,82,ly+8,330,26,2)}
-    // CENTER 210px: QR only, always centered
-    if(meta.qr){let url='';try{url=productDeepLink(p.id)}catch{}const q=qrDraw(x,url,468,by+48,155);if(q){x.fillStyle=V.a;x.font='700 16px Arial';x.textAlign='center';x.fillText('ПОДРОБНЕЕ',545,by+230);x.textAlign='left'}}
-    // RIGHT 355px: avatar + profile only
-    let sx=680, sy=by+48;if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,735,by+92,48);if(ok)sx=800}
-    x.fillStyle=V.a;x.font='800 18px Arial';x.fillText('ВАШ КОНСУЛЬТАНТ',sx,sy);sy+=38;
-    if(meta.sender.length){meta.sender.slice(0,5).forEach((v,i)=>{x.fillStyle=i===0?'#102F36':'#294E58';x.font=`${i===0?'800':'600'} ${i===0?28:23}px Arial`;sy=drawWrapped(x,v,sx,sy,1000-sx,29,1)})}
+    // V36.15 FIXED BOTTOM INFORMATION BAR — two immutable 50% columns.
+    // The heading sits ABOVE the white panel so it never competes with price/activity content.
+    const by=1570,bh=300;
+    x.fillStyle=V.a;x.font='900 24px Arial';x.fillText('ПРЕДЛОЖЕНИЕ',70,by-18);
+    rr(55,by,970,bh,32,'rgba(255,255,255,.98)',null);x.strokeStyle=V.a+'38';x.lineWidth=2;x.stroke();
+    x.strokeStyle='rgba(30,70,80,.14)';x.beginPath();x.moveTo(540,by+25);x.lineTo(540,by+bh-25);x.stroke();
+
+    // LEFT 50% — commercial data. Empty fields never move the right side.
+    const lx=82,lw=420;let ly=by+54;
+    const productObj=p||{};
+    let rub='';
+    if(cfg.priceMode==='member' && productObj.priceRub) rub=Number(productObj.priceRub).toLocaleString('ru-RU');
+    if(cfg.priceMode==='custom' && cfg.customPrice){const n=Number(String(cfg.customPrice).replace(/[^0-9.,]/g,'').replace(',','.'));rub=Number.isFinite(n)&&n>0?n.toLocaleString('ru-RU'):String(cfg.customPrice)}
+    if(rub){x.fillStyle=V.a;x.font='800 22px Arial';x.fillText(cfg.priceMode==='member'?'Цена для участников:':'Цена:',lx,ly);ly+=40;
+      let pv='';if(cfg.showPV&&productObj.pv)pv=`     ${Number(productObj.pv).toLocaleString('ru-RU')} PV`;
+      x.fillStyle='#102F36';x.font='900 31px Arial';x.fillText(`${rub} ₽${pv}`,lx,ly);ly+=44;
+    } else if(cfg.showPV&&cfg.priceMode!=='none'&&productObj.pv){x.fillStyle='#102F36';x.font='900 30px Arial';x.fillText(`${Number(productObj.pv).toLocaleString('ru-RU')} PV`,lx,ly);ly+=42}
+    if(meta.promo){x.fillStyle='#173D47';x.font='800 23px Arial';ly=drawWrapped(x,meta.promo,lx,ly+4,lw,29,2)}
+    if(meta.period){x.fillStyle='#506C76';x.font='700 19px Arial';drawWrapped(x,meta.period,lx,ly+8,lw,25,1)}
+
+    // RIGHT 50% — identity. Avatar/name/phone never move left when commercial fields are empty.
+    const rx=570,rw=420;let sx=rx,sy=by+58;
+    // QR lives in the upper-right corner, has no caption, and is forced off for custom price.
+    const showQr=meta.qr && cfg.priceMode!=='custom';
+    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{}qrDraw(x,url,890,by+28,105)}
+    if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,625,by+88,48);if(ok)sx=690}
+    x.fillStyle=V.a;x.font='900 19px Arial';x.fillText('ВАШ КОНСУЛЬТАНТ',sx,sy);sy+=39;
+    if(meta.sender.length){meta.sender.slice(0,5).forEach((v,i)=>{x.fillStyle=i===0?'#102F36':'#294E58';x.font=`${i===0?'900':'700'} ${i===0?27:21}px Arial`;sy=drawWrapped(x,v,sx,sy,showQr?185:300,28,2)})}
     // footer
     x.strokeStyle='rgba(30,70,80,.18)';x.beginPath();x.moveTo(70,1880);x.lineTo(1010,1880);x.stroke();x.fillStyle=V.a;x.font='800 18px Arial';x.fillText('FUTURE HEALTH · SHARE HAPPINESS',70,1910);
     return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('canvas blob')),'image/png'));
