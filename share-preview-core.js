@@ -73,7 +73,7 @@
     let period='';try{period=typeof offerPeriod==='function'?offerPeriod(cfg):''}catch{}
     return {prices,sender,period,promo:String(cfg?.promo||'').trim(),qr:cfg?.showQR!==false,avatar:cfg?.showAvatar===false?'':(cfg?.avatar||''),crop:cfg?.avatarCrop||window.shareAvatarCrop||{scale:1,x:0,y:0}};
   }
-  async function drawAvatar(ctx,data,crop,cx,cy,r){if(!data)return false;try{const im=await loadImage(data);ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();const base=Math.max((2*r)/im.width,(2*r)/im.height),sc=base*Math.max(1,Number(crop?.scale)||1),w=im.width*sc,h=im.height*sc;const k=(2*r)/230;ctx.drawImage(im,cx-w/2+(Number(crop?.x)||0)*k,cy-h/2+(Number(crop?.y)||0)*k,w,h);ctx.restore();return true}catch{return false}}
+  async function drawAvatar(ctx,data,crop,cx,cy,r){if(!data)return false;try{const im=await loadImage(data);ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();const scale=Math.max(1,Number(crop?.scale)||1),nx=Number.isFinite(Number(crop?.nx))?Number(crop.nx):(Number(crop?.x)||0)/230,ny=Number.isFinite(Number(crop?.ny))?Number(crop.ny):(Number(crop?.y)||0)/230;const base=Math.max((2*r)/im.width,(2*r)/im.height),sc=base*scale,w=im.width*sc,h=im.height*sc;ctx.drawImage(im,cx-w/2+nx*(2*r),cy-h/2+ny*(2*r),w,h);ctx.restore();return true}catch{return false}}
   function qrDraw(ctx,text,x,y,size){try{if(typeof drawQrToCanvas==='function')return drawQrToCanvas(ctx,text,x,y,size);return 0}catch{return 0}}
   async function card(p,index=0,cfg={}){
     // V36.14: 1080x1920 logical layout rendered at 1.5x for a 1620x2880 HD PNG.
@@ -111,15 +111,12 @@
       let y=text(p?.name||'Продукт',70,835,940,48,'800','#102F36',4,1.16);y=text(summary,70,y+22,940,31,'500','#355864',5,1.38);
       x.fillStyle=V.a;x.font='800 23px Arial';x.fillText('КЛЮЧЕВЫЕ ОСОБЕННОСТИ',70,y+38);const fy=y+70;feats.forEach((f,i)=>{const xx=70+i*315;rr(xx,fy,295,205,26,'rgba(255,255,255,.94)',null);x.fillStyle=[V.a,V.b,V.hot][i];x.beginPath();x.arc(xx+42,fy+45,24,0,Math.PI*2);x.fill();x.fillStyle=i===2?'#573800':'#fff';x.font='800 22px Arial';x.textAlign='center';x.fillText(String(i+1),xx+42,fy+53);x.textAlign='left';text(f,xx+25,fy+95,245,27,'700','#244652',4,1.22)});
     }
-    // V36.15 FIXED BOTTOM INFORMATION BAR — two immutable 50% columns.
-    // The heading sits ABOVE the white panel so it never competes with price/activity content.
-    const by=1570,bh=300;
-    x.fillStyle=V.a;x.font='900 24px Arial';x.fillText('ПРЕДЛОЖЕНИЕ',70,by-18);
-    rr(55,by,970,bh,32,'rgba(255,255,255,.98)',null);x.strokeStyle=V.a+'38';x.lineWidth=2;x.stroke();
-    x.strokeStyle='rgba(30,70,80,.14)';x.beginPath();x.moveTo(540,by+25);x.lineTo(540,by+bh-25);x.stroke();
+    // Product QR: QR size stays unchanged; only its white container is tightened around the same center.
+    const showQr=meta.qr && cfg.priceMode!=='custom';
+    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};const qs=152,bs=160,qcx=932,qcy=184,bx=qcx-bs/2,byQr=qcy-bs/2;x.save();x.globalAlpha=.98;rr(bx,byQr,bs,bs,14,'rgba(255,255,255,.99)',null);const qx=qcx-qs/2,qy=qcy-qs/2;qrDraw(x,url,qx,qy,qs);x.restore()}
 
-    // LEFT 50% — commercial data. Layout is vertically balanced inside its fixed half.
-    const lx=82,lw=420;
+    // V38 RC2 adaptive publication block. It is not hard-coded to 50/50.
+    const by=1570,bh=300;
     const productObj=p||{};
     let rub='';
     if(cfg.priceMode==='member' && productObj.priceRub) rub=Number(productObj.priceRub).toLocaleString('ru-RU');
@@ -129,28 +126,42 @@
     else if(cfg.showPV&&cfg.priceMode!=='none'&&productObj.pv)commercial.push({kind:'price',text:`${Number(productObj.pv).toLocaleString('ru-RU')} PV`});
     if(meta.promo)commercial.push({kind:'promo',text:meta.promo});
     if(meta.period)commercial.push({kind:'period',text:meta.period});
-    const metrics={label:{font:'800 24px Arial',lh:31,max:1,color:V.a},price:{font:'900 38px Arial',lh:45,max:1,color:'#102F36'},promo:{font:'800 25px Arial',lh:31,max:2,color:'#173D47'},period:{font:'700 21px Arial',lh:27,max:2,color:'#506C76'}};
-    let blockH=0;const measured=commercial.map(it=>{const m=metrics[it.kind];x.font=m.font;let lines=wrap(x,it.text,lw,m.max);if(it.kind==='price'&&lines.length>1)lines=[it.text];const h=Math.max(m.lh,lines.length*m.lh);blockH+=h+8;return {...it,m,lines,h}});if(blockH)blockH-=8;
-    let ly=by+Math.max(38,(bh-blockH)/2);
-    for(const it of measured){x.fillStyle=it.m.color;x.font=it.m.font;if(it.kind==='price'&&x.measureText(it.text).width>lw){let fs=38;while(fs>29&&x.measureText(it.text).width>lw){fs--;x.font=`900 ${fs}px Arial`}}for(const line of it.lines){x.fillText(line,lx,ly);ly+=it.m.lh}ly+=8}
 
-    // RIGHT 50% — one profile source, vertically balanced. Avatar/no-avatar have different text widths.
-    let sx=592;
-    const showQr=meta.qr && cfg.priceMode!=='custom';
-    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};const bx=850,byQr=102,bs=164,qs=152;x.save();x.globalAlpha=.98;rr(bx,byQr,bs,bs,16,'rgba(255,255,255,.99)',null);const qx=bx+(bs-qs)/2,qy=byQr+(bs-qs)/2;qrDraw(x,url,qx,qy,qs);x.restore()}
-    const hasAvatar=!!meta.avatar;if(hasAvatar)sx=690;
-    const textRight=990,avail=Math.max(120,textRight-sx);
     const status=typeof senderStatusLabel==='function'?senderStatusLabel(cfg.senderStatus):'';
     const profile=[];
     if(status)profile.push({kind:'status',text:status.toUpperCase()});
     if(cfg.senderName)profile.push({kind:'name',text:String(cfg.senderName)});
     if(cfg.senderPhone)profile.push({kind:'phone',text:String(cfg.senderPhone)});
     (cfg.senderContacts||[]).slice(0,2).forEach(c=>{if(c?.value)profile.push({kind:String(c.type).toLowerCase().includes('адрес')?'address':'contact',text:`${c.type}: ${String(c.value).trim()}`})});
-    const pm={status:{w:900,fs:21,min:15,lh:29,color:V.a,max:1},name:{w:900,fs:27,min:18,lh:35,color:'#102F36',max:1},phone:{w:700,fs:21,min:17,lh:29,color:'#294E58',max:1},contact:{w:700,fs:19,min:15,lh:26,color:'#294E58',max:2},address:{w:700,fs:19,min:15,lh:25,color:'#294E58',max:hasAvatar?2:3}};
-    let ph=0;const pdata=profile.map(it=>{const m=pm[it.kind];let fs=m.fs;x.font=`${m.w} ${fs}px Arial`;if(m.max===1){while(fs>m.min&&x.measureText(it.text).width>avail){fs--;x.font=`${m.w} ${fs}px Arial`}const lines=[it.text];const h=m.lh;ph+=h+5;return {...it,m,fs,lines,h}}const lines=wrap(x,it.text,avail,m.max),h=Math.max(m.lh,lines.length*m.lh);ph+=h+5;return {...it,m,fs,lines,h}});if(ph)ph-=5;
-    let sy=by+Math.max(38,(bh-ph)/2)+20;
-    if(hasAvatar){await drawAvatar(x,meta.avatar,meta.crop,625,by+bh/2,48)}
-    for(const it of pdata){x.fillStyle=it.m.color;x.font=`${it.m.w} ${it.fs}px Arial`;for(const line of it.lines){x.fillText(line,sx,sy);sy+=it.m.lh}sy+=5}
+    const hasCommercial=commercial.length>0, hasProfile=profile.length>0, hasAvatar=!!meta.avatar;
+
+    if(hasCommercial||hasProfile){
+      x.fillStyle=V.a;x.font='900 24px Arial';x.fillText('ПРЕДЛОЖЕНИЕ',70,by-18);
+      rr(55,by,970,bh,32,'rgba(255,255,255,.98)',null);x.strokeStyle=V.a+'38';x.lineWidth=2;x.stroke();
+      // When both blocks exist, give the denser block slightly more room; otherwise use the full panel.
+      let split=540;
+      if(hasCommercial&&hasProfile){const commercialWeight=(rub?2:0)+(meta.promo?2:0)+(meta.period?1:0);const profileWeight=profile.length+(hasAvatar?1:0);split=commercialWeight>profileWeight?575:(profileWeight>commercialWeight+1?500:540);x.strokeStyle='rgba(30,70,80,.14)';x.beginPath();x.moveTo(split,by+25);x.lineTo(split,by+bh-25);x.stroke()}
+
+      if(hasCommercial){
+        const lx=hasProfile?82:100,lw=hasProfile?(split-lx-30):880;
+        const metrics={label:{font:'800 27px Arial',lh:35,max:1,color:V.a},price:{font:'900 44px Arial',lh:51,max:1,color:'#102F36'},promo:{font:'800 29px Arial',lh:36,max:2,color:'#173D47'},period:{font:'700 24px Arial',lh:31,max:2,color:'#506C76'}};
+        let blockH=0;const measured=commercial.map(it=>{const m=metrics[it.kind];x.font=m.font;let lines=wrap(x,it.text,lw,m.max);if(it.kind==='price'&&lines.length>1)lines=[it.text];const h=Math.max(m.lh,lines.length*m.lh);blockH+=h+10;return {...it,m,lines,h}});if(blockH)blockH-=10;
+        let ly=by+Math.max(40,(bh-blockH)/2);
+        // Promotion gets a restrained gift badge; price remains the strongest visual element.
+        if(meta.promo){const gx=hasProfile?lx+lw-62:lx+lw-72,gy=by+48;x.save();x.fillStyle='#fff0f3';rr(gx-30,gy-30,60,60,16,'#fff0f3',null);x.strokeStyle='#e64c70';x.lineWidth=4;x.strokeRect(gx-18,gy-4,36,26);x.beginPath();x.moveTo(gx,gy-4);x.lineTo(gx,gy+22);x.moveTo(gx-23,gy-4);x.lineTo(gx+23,gy-4);x.stroke();x.beginPath();x.arc(gx-9,gy-15,9,Math.PI*.15,Math.PI*1.25);x.arc(gx+9,gy-15,9,Math.PI*-.25,Math.PI*.85);x.stroke();x.restore()}
+        for(const it of measured){x.fillStyle=it.m.color;x.font=it.m.font;if(it.kind==='price'&&x.measureText(it.text).width>lw){let fs=44;while(fs>31&&x.measureText(it.text).width>lw){fs--;x.font=`900 ${fs}px Arial`}}for(const line of it.lines){x.fillText(line,lx,ly);ly+=it.m.lh}ly+=10}
+      }
+
+      if(hasProfile){
+        const left=hasCommercial?split+34:105,right=hasCommercial?990:975;
+        let sx=left+(hasAvatar?112:0),avail=Math.max(150,right-sx);
+        const pm={status:{w:900,fs:23,min:16,lh:31,color:V.a,max:1},name:{w:900,fs:29,min:18,lh:37,color:'#102F36',max:1},phone:{w:700,fs:23,min:17,lh:31,color:'#294E58',max:1},contact:{w:700,fs:21,min:15,lh:29,color:'#294E58',max:2},address:{w:700,fs:20,min:15,lh:28,color:'#294E58',max:hasAvatar?3:3}};
+        let ph=0;const pdata=profile.map(it=>{const m=pm[it.kind];let fs=m.fs;x.font=`${m.w} ${fs}px Arial`;if(m.max===1){while(fs>m.min&&x.measureText(it.text).width>avail){fs--;x.font=`${m.w} ${fs}px Arial`}const lines=[it.text],h=m.lh;ph+=h+7;return {...it,m,fs,lines,h}}const lines=wrap(x,it.text,avail,m.max),h=Math.max(m.lh,lines.length*m.lh);ph+=h+7;return {...it,m,fs,lines,h}});if(ph)ph-=7;
+        let sy=by+Math.max(38,(bh-ph)/2)+18;
+        if(hasAvatar){await drawAvatar(x,meta.avatar,meta.crop,left+48,by+bh/2,48)}
+        for(const it of pdata){x.fillStyle=it.m.color;x.font=`${it.m.w} ${it.fs}px Arial`;for(const line of it.lines){x.fillText(line,sx,sy);sy+=it.m.lh}sy+=7}
+      }
+    }
     // footer
     x.strokeStyle='rgba(30,70,80,.18)';x.beginPath();x.moveTo(70,1880);x.lineTo(1010,1880);x.stroke();x.fillStyle=V.a;x.font='800 18px Arial';x.fillText('FUTURE HEALTH · SHARE HAPPINESS',70,1910);
     return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('canvas blob')),'image/png'));
@@ -163,11 +174,17 @@
     return [];
   }
   function getProduct(id){try{return products.find(p=>p.id===id)}catch{return null}}
+  function meaningful(cfg){
+    const commercial=cfg.priceMode!=='none'||!!cfg.showPV||!!String(cfg.promo||'').trim()||!!cfg.start||!!cfg.end;
+    const personal=(cfg.senderStatus&&cfg.senderStatus!=='none')||!!String(cfg.senderName||'').trim()||!!String(cfg.senderPhone||'').trim()||(cfg.senderContacts||[]).some(c=>String(c?.value||'').trim());
+    return {commercial,personal};
+  }
   async function runPreview(btn){
     if(btn.dataset.fhBusy==='1')return;btn.dataset.fhBusy='1';const old=btn.textContent;btn.textContent='Создание…';
     const busy=document.createElement('div');busy.className='fhCoreBusy';busy.textContent='Создание предпросмотра…';document.body.appendChild(busy);
     try{
       const ids=idsFromConfig();if(!ids.length)throw new Error('Не удалось определить выбранный продукт');
+      const states=ids.map((id,i)=>meaningful(cfgForIndex(i,id)));if(states.every(v=>!v.commercial&&!v.personal))throw new Error('Добавьте данные отправителя и/или информацию о предложении перед созданием публикации');if(states.some(v=>v.commercial&&!v.personal))toast('Совет: добавьте данные отправителя, чтобы после пересылки покупатель понимал, к кому обратиться');
       const files=[];for(const id of ids){const p=getProduct(id);if(!p)continue;const cfg=cfgForIndex(files.length,id);const b=await card(p,files.length,cfg);files.push({url:URL.createObjectURL(b),blob:b,name:p.name})}
       if(!files.length)throw new Error('Карточка не создана');openPreview(files);
     }catch(e){console.error('[FH preview core]',e);toast(e?.message||'Ошибка создания предпросмотра')}
