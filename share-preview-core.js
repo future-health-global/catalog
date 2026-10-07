@@ -118,31 +118,39 @@
     rr(55,by,970,bh,32,'rgba(255,255,255,.98)',null);x.strokeStyle=V.a+'38';x.lineWidth=2;x.stroke();
     x.strokeStyle='rgba(30,70,80,.14)';x.beginPath();x.moveTo(540,by+25);x.lineTo(540,by+bh-25);x.stroke();
 
-    // LEFT 50% — commercial data. Empty fields never move the right side.
-    const lx=82,lw=420;let ly=by+54;
+    // LEFT 50% — commercial data. Layout is vertically balanced inside its fixed half.
+    const lx=82,lw=420;
     const productObj=p||{};
     let rub='';
     if(cfg.priceMode==='member' && productObj.priceRub) rub=Number(productObj.priceRub).toLocaleString('ru-RU');
     if(cfg.priceMode==='custom' && cfg.customPrice){const n=Number(String(cfg.customPrice).replace(/[^0-9.,]/g,'').replace(',','.'));rub=Number.isFinite(n)&&n>0?n.toLocaleString('ru-RU'):String(cfg.customPrice)}
-    if(rub){x.fillStyle=V.a;x.font='800 22px Arial';x.fillText(cfg.priceMode==='member'?'Цена для участников:':'Цена:',lx,ly);ly+=40;
-      let pv='';if(cfg.showPV&&productObj.pv)pv=`     ${Number(productObj.pv).toLocaleString('ru-RU')} PV`;
-      x.fillStyle='#102F36';x.font='900 31px Arial';x.fillText(`${rub} ₽${pv}`,lx,ly);ly+=44;
-    } else if(cfg.showPV&&cfg.priceMode!=='none'&&productObj.pv){x.fillStyle='#102F36';x.font='900 30px Arial';x.fillText(`${Number(productObj.pv).toLocaleString('ru-RU')} PV`,lx,ly);ly+=42}
-    if(meta.promo){x.fillStyle='#173D47';x.font='800 23px Arial';ly=drawWrapped(x,meta.promo,lx,ly+4,lw,29,2)}
-    if(meta.period){x.fillStyle='#506C76';x.font='700 19px Arial';drawWrapped(x,meta.period,lx,ly+8,lw,25,2)}
+    const commercial=[];
+    if(rub){commercial.push({kind:'label',text:cfg.priceMode==='member'?'Цена для участников:':'Цена:'});let pv='';if(cfg.showPV&&productObj.pv)pv=`     ${Number(productObj.pv).toLocaleString('ru-RU')} PV`;commercial.push({kind:'price',text:`${rub} ₽${pv}`})}
+    else if(cfg.showPV&&cfg.priceMode!=='none'&&productObj.pv)commercial.push({kind:'price',text:`${Number(productObj.pv).toLocaleString('ru-RU')} PV`});
+    if(meta.promo)commercial.push({kind:'promo',text:meta.promo});
+    if(meta.period)commercial.push({kind:'period',text:meta.period});
+    const metrics={label:{font:'800 24px Arial',lh:31,max:1,color:V.a},price:{font:'900 38px Arial',lh:45,max:1,color:'#102F36'},promo:{font:'800 25px Arial',lh:31,max:2,color:'#173D47'},period:{font:'700 21px Arial',lh:27,max:2,color:'#506C76'}};
+    let blockH=0;const measured=commercial.map(it=>{const m=metrics[it.kind];x.font=m.font;let lines=wrap(x,it.text,lw,m.max);if(it.kind==='price'&&lines.length>1)lines=[it.text];const h=Math.max(m.lh,lines.length*m.lh);blockH+=h+8;return {...it,m,lines,h}});if(blockH)blockH-=8;
+    let ly=by+Math.max(38,(bh-blockH)/2);
+    for(const it of measured){x.fillStyle=it.m.color;x.font=it.m.font;if(it.kind==='price'&&x.measureText(it.text).width>lw){let fs=38;while(fs>29&&x.measureText(it.text).width>lw){fs--;x.font=`900 ${fs}px Arial`}}for(const line of it.lines){x.fillText(line,lx,ly);ly+=it.m.lh}ly+=8}
 
-    // RIGHT 50% — identity. No hard-coded status: render exactly the status selected by the sender.
-    const rx=570,rw=420;let sx=592,sy=by+58;
+    // RIGHT 50% — one profile source, vertically balanced. Avatar/no-avatar have different text widths.
+    let sx=592;
     const showQr=meta.qr && cfg.priceMode!=='custom';
-    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};x.save();x.globalAlpha=.97;rr(842,96,176,176,18,'rgba(255,255,255,.98)',null);qrDraw(x,url,856,110,148);x.restore()}
-    if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,625,by+88,48);if(ok)sx=690}
-    const textRight=990, avail=Math.max(120,textRight-sx);
-    function oneLine(text,weight,size,minSize,color){if(!text)return;let fs=size;x.fillStyle=color;while(fs>minSize){x.font=`${weight} ${fs}px Arial`;if(x.measureText(text).width<=avail)break;fs-=1}x.fillText(text,sx,sy);sy+=fs+11}
+    if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};const bx=850,byQr=102,bs=164,qs=152;x.save();x.globalAlpha=.98;rr(bx,byQr,bs,bs,16,'rgba(255,255,255,.99)',null);const qx=bx+(bs-qs)/2,qy=byQr+(bs-qs)/2;qrDraw(x,url,qx,qy,qs);x.restore()}
+    const hasAvatar=!!meta.avatar;if(hasAvatar)sx=690;
+    const textRight=990,avail=Math.max(120,textRight-sx);
     const status=typeof senderStatusLabel==='function'?senderStatusLabel(cfg.senderStatus):'';
-    oneLine(status?status.toUpperCase():'',900,21,15,V.a);
-    oneLine(String(cfg.senderName||''),900,27,18,'#102F36');
-    oneLine(String(cfg.senderPhone||''),700,21,17,'#294E58');
-    (cfg.senderContacts||[]).slice(0,2).forEach(c=>{if(!c?.value)return;const line=`${c.type}: ${String(c.value).trim()}`;x.fillStyle='#294E58';x.font='700 19px Arial';const isAddr=String(c.type).toLowerCase().includes('адрес');if(isAddr)sy=drawWrapped(x,line,sx,sy,avail,25,meta.avatar?3:2);else {let fs=19;while(fs>15){x.font=`700 ${fs}px Arial`;if(x.measureText(line).width<=avail)break;fs--}if(x.measureText(line).width<=avail){x.fillText(line,sx,sy);sy+=fs+9}else sy=drawWrapped(x,line,sx,sy,avail,24,2)}});
+    const profile=[];
+    if(status)profile.push({kind:'status',text:status.toUpperCase()});
+    if(cfg.senderName)profile.push({kind:'name',text:String(cfg.senderName)});
+    if(cfg.senderPhone)profile.push({kind:'phone',text:String(cfg.senderPhone)});
+    (cfg.senderContacts||[]).slice(0,2).forEach(c=>{if(c?.value)profile.push({kind:String(c.type).toLowerCase().includes('адрес')?'address':'contact',text:`${c.type}: ${String(c.value).trim()}`})});
+    const pm={status:{w:900,fs:21,min:15,lh:29,color:V.a,max:1},name:{w:900,fs:27,min:18,lh:35,color:'#102F36',max:1},phone:{w:700,fs:21,min:17,lh:29,color:'#294E58',max:1},contact:{w:700,fs:19,min:15,lh:26,color:'#294E58',max:2},address:{w:700,fs:19,min:15,lh:25,color:'#294E58',max:hasAvatar?2:3}};
+    let ph=0;const pdata=profile.map(it=>{const m=pm[it.kind];let fs=m.fs;x.font=`${m.w} ${fs}px Arial`;if(m.max===1){while(fs>m.min&&x.measureText(it.text).width>avail){fs--;x.font=`${m.w} ${fs}px Arial`}const lines=[it.text];const h=m.lh;ph+=h+5;return {...it,m,fs,lines,h}}const lines=wrap(x,it.text,avail,m.max),h=Math.max(m.lh,lines.length*m.lh);ph+=h+5;return {...it,m,fs,lines,h}});if(ph)ph-=5;
+    let sy=by+Math.max(38,(bh-ph)/2)+20;
+    if(hasAvatar){await drawAvatar(x,meta.avatar,meta.crop,625,by+bh/2,48)}
+    for(const it of pdata){x.fillStyle=it.m.color;x.font=`${it.m.w} ${it.fs}px Arial`;for(const line of it.lines){x.fillText(line,sx,sy);sy+=it.m.lh}sy+=5}
     // footer
     x.strokeStyle='rgba(30,70,80,.18)';x.beginPath();x.moveTo(70,1880);x.lineTo(1010,1880);x.stroke();x.fillStyle=V.a;x.font='800 18px Arial';x.fillText('FUTURE HEALTH · SHARE HAPPINESS',70,1910);
     return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('canvas blob')),'image/png'));
