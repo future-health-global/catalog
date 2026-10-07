@@ -75,13 +75,127 @@
   }
   async function drawAvatar(ctx,data,crop,cx,cy,r){if(!data)return false;try{const im=await loadImage(data);ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();const scale=Math.max(1,Number(crop?.scale)||1),nx=Number.isFinite(Number(crop?.nx))?Number(crop.nx):(Number(crop?.x)||0)/230,ny=Number.isFinite(Number(crop?.ny))?Number(crop.ny):(Number(crop?.y)||0)/230;const base=Math.max((2*r)/im.width,(2*r)/im.height),sc=base*scale,w=im.width*sc,h=im.height*sc;ctx.drawImage(im,cx-w/2+nx*(2*r),cy-h/2+ny*(2*r),w,h);ctx.restore();return true}catch{return false}}
   function qrDraw(ctx,text,x,y,size){try{if(typeof drawQrToCanvas==='function')return drawQrToCanvas(ctx,text,x,y,size);return 0}catch{return 0}}
+  function publicationData(p,cfg){
+    const meta=metaLines(p,cfg),commercial=[],profile=[];
+    let rub='';
+    if(cfg.priceMode==='member'&&p?.priceRub)rub=Number(p.priceRub).toLocaleString('ru-RU');
+    if(cfg.priceMode==='custom'&&String(cfg.customPrice||'').trim()){
+      const n=Number(String(cfg.customPrice).replace(/[^0-9.,]/g,'').replace(',','.'));
+      rub=Number.isFinite(n)&&n>0?n.toLocaleString('ru-RU'):String(cfg.customPrice).trim();
+    }
+    const pv=cfg.showPV&&p?.pv?`${Number(p.pv).toLocaleString('ru-RU')} PV`:'';
+    if(rub){commercial.push({kind:'label',text:cfg.priceMode==='member'?'Цена для участников:':'Цена:'});commercial.push({kind:'price',text:`${rub} ₽${pv?'   '+pv:''}`})}
+    else if(pv)commercial.push({kind:'price',text:pv});
+    if(meta.promo)commercial.push({kind:'promo',text:meta.promo});
+    if(meta.period)commercial.push({kind:'period',text:meta.period});
+    const status=typeof senderStatusLabel==='function'?senderStatusLabel(cfg.senderStatus):'';
+    if(status)profile.push({kind:'status',text:status.toUpperCase()});
+    if(String(cfg.senderName||'').trim())profile.push({kind:'name',text:String(cfg.senderName).trim()});
+    if(String(cfg.senderPhone||'').trim())profile.push({kind:'phone',text:String(cfg.senderPhone).trim()});
+    (cfg.senderContacts||[]).slice(0,2).forEach(c=>{if(String(c?.value||'').trim())profile.push({kind:String(c.type).toLowerCase().includes('адрес')?'address':'contact',text:`${c.type}: ${String(c.value).trim()}`})});
+    return {meta,commercial,profile,rub};
+  }
+  // Unlike the legacy summary wrapper, publication text must never be truncated.
+  function publicationWrap(ctx,text,width){
+    const lines=[];let line='';
+    for(const word of String(text).trim().split(/\s+/)){
+      if(line&&ctx.measureText(line+' '+word).width<=width){line+=' '+word;continue}
+      if(line){lines.push(line);line=''}
+      for(const char of word){if(line&&ctx.measureText(line+char).width>width){lines.push(line);line=''}line+=char}
+    }
+    if(line)lines.push(line);
+    return lines;
+  }
+  function measurePublicationText(ctx,text,width,size,weight,lineHeight){
+    ctx.font=`${weight} ${size}px Arial`;
+    const lines=publicationWrap(ctx,text,width);
+    const metrics=lines.map(line=>ctx.measureText(line));
+    const ascent=Math.max(size*.75,...metrics.map(m=>m.actualBoundingBoxAscent||0));
+    const descent=Math.max(size*.2,...metrics.map(m=>m.actualBoundingBoxDescent||0));
+    const advance=Math.max(lineHeight,ascent+descent);
+    return {lines,font:ctx.font,ascent,advance,height:(lines.length-1)*advance+ascent+descent};
+  }
+  function measureCommercial(ctx,items,width,scale){
+    const styles={label:[25,800,30],price:[50,900,58],promo:[28,900,34],period:[23,700,29]};
+    const blocks=[];let height=0;
+    for(const item of items){
+      const [base,weight,lh]=styles[item.kind];
+      let size=base*scale;
+      const promo=item.kind==='promo',icon=promo?76*scale:0,padding=promo?16*scale:0;
+      if(item.kind==='price'){
+        ctx.font=`${weight} ${size}px Arial`;
+        while(size>31*scale&&ctx.measureText(item.text).width>width){size-=1;ctx.font=`${weight} ${size}px Arial`}
+      }
+      const text=measurePublicationText(ctx,item.text,width-icon-padding*2,size,weight,lh*scale);
+      const gap=blocks.length?(item.kind==='price'?8:item.kind==='promo'?18:10)*scale:0;
+      const blockHeight=promo?Math.max(82*scale,text.height+padding*2):text.height;
+      height+=gap;
+      blocks.push({...item,...text,top:height,height:blockHeight,textHeight:text.height,icon,padding,scale});
+      height+=blockHeight;
+    }
+    return {blocks,height};
+  }
+  function measureProfile(ctx,items,width,scale){
+    const styles={status:[23,900,31],name:[29,900,37],phone:[23,700,31],contact:[21,700,29],address:[20,700,28]};
+    const blocks=[];let height=0;
+    for(const item of items){
+      const [base,weight,lh]=styles[item.kind];
+      const text=measurePublicationText(ctx,item.text,width,base*scale,weight,lh*scale);
+      if(blocks.length)height+=7*scale;
+      blocks.push({...item,...text,top:height});height+=text.height;
+    }
+    return {blocks,height};
+  }
+  function layoutPublication(ctx,commercial,profile,avatar,rub,promo,period,box){
+    const both=commercial.length>0&&(profile.length>0||avatar);
+    const commercialWeight=(rub?2:0)+(promo?2:0)+(period?1:0),profileWeight=profile.length+(avatar?1:0);
+    const preferred=commercialWeight>profileWeight?575:(profileWeight>commercialWeight+1?500:540);
+    const splits=both?[preferred,...[500,540,575].filter(v=>v!==preferred)]:[null];
+    const available=box.height-48;
+    for(let step=0;step<=8;step++){
+      const scale=1-step*.04;
+      for(const split of splits){
+        const left=commercial.length?(both?82:100):null;
+        const width=commercial.length?(both?split-left-30:880):0;
+        const profileLeft=both?split+34:105,profileRight=both?990:975;
+        const profileX=profileLeft+(avatar?112:0);
+        const cm=measureCommercial(ctx,commercial,width,scale);
+        const pm=measureProfile(ctx,profile,profileRight-profileX,scale);
+        if(cm.height<=available&&pm.height<=available){
+          return {split,commercial:{...cm,x:left,width,y:box.y+24},profile:{...pm,x:profileX,y:box.y+24+(available-pm.height)/2,avatarX:profileLeft+48}};
+        }
+      }
+    }
+    throw new Error('Текст предложения или контактов слишком длинный. Сократите его, чтобы вся информация поместилась на карточке.');
+  }
+  function renderPublicationText(ctx,block,left,top,color){
+    ctx.font=block.font;ctx.fillStyle=color;ctx.textBaseline='alphabetic';
+    block.lines.forEach((line,i)=>ctx.fillText(line,left,top+block.ascent+i*block.advance));
+  }
+  function renderCommercial(ctx,layout,accent){
+    for(const block of layout.blocks){
+      const top=layout.y+block.top;
+      if(block.kind!=='promo'){renderPublicationText(ctx,block,layout.x,top,block.kind==='price'?'#e85a00':block.kind==='period'?'#506C76':accent);continue}
+      rounded(ctx,layout.x,top,layout.width,block.height,20*block.scale,'#e51f3f',null);
+      ctx.save();ctx.translate(layout.x+block.padding+block.icon/2,top+block.height/2);ctx.scale(block.scale,block.scale);
+      ctx.strokeStyle='#fff';ctx.lineWidth=6;ctx.lineCap='round';ctx.lineJoin='round';
+      ctx.strokeRect(-22,-9,44,31);ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(0,22);ctx.moveTo(-28,-9);ctx.lineTo(28,-9);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-2,-11);ctx.bezierCurveTo(-28,-16,-23,-36,-5,-25);ctx.moveTo(2,-11);ctx.bezierCurveTo(28,-16,23,-36,5,-25);ctx.stroke();ctx.restore();
+      renderPublicationText(ctx,block,layout.x+block.padding+block.icon,top+(block.height-block.textHeight)/2,'#fff');
+    }
+  }
   async function card(p,index=0,cfg={}){
     // V36.14: 1080x1920 logical layout rendered at 1.5x for a 1620x2880 HD PNG.
     const W=1080,H=1920,S=1.5,c=document.createElement('canvas');c.width=W*S;c.height=H*S;const x=c.getContext('2d');x.scale(S,S);
     const tpl=selectedTemplate(index),colorKey=selectedColor(index);
     const vivid={blue:{a:'#073B78',b:'#00A7D8',hot:'#F2B84B',soft:'#E8F7FF'},green:{a:'#064E3B',b:'#22A06B',hot:'#F5B942',soft:'#EAF9EF'},turquoise:{a:'#005F63',b:'#00B8A9',hot:'#FFB547',soft:'#E5FFFB'},violet:{a:'#4A2478',b:'#A63FD4',hot:'#FFB24A',soft:'#F5EAFE'},warm:{a:'#9B3F18',b:'#F0782B',hot:'#F5C84C',soft:'#FFF0E4'}};
     const V=vivid[colorKey]||vivid.blue,accent=V.a;
-    const summary=(()=>{try{return typeof officialShareSummary==='function'?officialShareSummary(p):''}catch{return ''}})(),feats=featuresFor(p),meta=metaLines(p,cfg);
+    const summary=(()=>{try{return typeof officialShareSummary==='function'?officialShareSummary(p):''}catch{return ''}})(),feats=featuresFor(p);
+    const {meta,commercial,profile,rub}=publicationData(p,cfg);
+    const hasCommercial=commercial.length>0,hasAvatar=!!meta.avatar,hasProfile=profile.length>0||hasAvatar;
+    if(!hasCommercial&&!hasProfile)throw new Error('Добавьте данные отправителя и/или информацию о предложении перед созданием публикации');
+    const by=1570,bh=300;
+    const publication=layoutPublication(x,commercial,profile,hasAvatar,rub,meta.promo,meta.period,{y:by,height:bh});
     let im=null;try{const src=imgSrc(p);if(src)im=await loadImage(src)}catch{}
     // vivid premium background
     const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,V.soft);g.addColorStop(.48,'#fff');g.addColorStop(1,V.soft);x.fillStyle=g;x.fillRect(0,0,W,H);
@@ -115,61 +229,15 @@
     const showQr=meta.qr && cfg.priceMode!=='custom';
     if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};const qs=152,bs=160,qcx=932,qcy=184,bx=qcx-bs/2,byQr=qcy-bs/2;x.save();x.globalAlpha=.98;rr(bx,byQr,bs,bs,14,'rgba(255,255,255,.99)',null);const qx=qcx-qs/2,qy=qcy-qs/2;qrDraw(x,url,qx,qy,qs);x.restore()}
 
-    // V38 RC2 adaptive publication block. It is not hard-coded to 50/50.
-    const by=1570,bh=300;
-    const productObj=p||{};
-    let rub='';
-    if(cfg.priceMode==='member' && productObj.priceRub) rub=Number(productObj.priceRub).toLocaleString('ru-RU');
-    if(cfg.priceMode==='custom' && cfg.customPrice){const n=Number(String(cfg.customPrice).replace(/[^0-9.,]/g,'').replace(',','.'));rub=Number.isFinite(n)&&n>0?n.toLocaleString('ru-RU'):String(cfg.customPrice)}
-    const commercial=[];
-    if(rub){commercial.push({kind:'label',text:cfg.priceMode==='member'?'Цена для участников:':'Цена:'});let pv='';if(cfg.showPV&&productObj.pv)pv=`     ${Number(productObj.pv).toLocaleString('ru-RU')} PV`;commercial.push({kind:'price',text:`${rub} ₽${pv}`})}
-    else if(cfg.showPV&&cfg.priceMode!=='none'&&productObj.pv)commercial.push({kind:'price',text:`${Number(productObj.pv).toLocaleString('ru-RU')} PV`});
-    if(meta.promo)commercial.push({kind:'promo',text:meta.promo});
-    if(meta.period)commercial.push({kind:'period',text:meta.period});
-
-    const status=typeof senderStatusLabel==='function'?senderStatusLabel(cfg.senderStatus):'';
-    const profile=[];
-    if(status)profile.push({kind:'status',text:status.toUpperCase()});
-    if(cfg.senderName)profile.push({kind:'name',text:String(cfg.senderName)});
-    if(cfg.senderPhone)profile.push({kind:'phone',text:String(cfg.senderPhone)});
-    (cfg.senderContacts||[]).slice(0,2).forEach(c=>{if(c?.value)profile.push({kind:String(c.type).toLowerCase().includes('адрес')?'address':'contact',text:`${c.type}: ${String(c.value).trim()}`})});
-    const hasCommercial=commercial.length>0, hasProfile=profile.length>0, hasAvatar=!!meta.avatar;
-
-    if(hasCommercial||hasProfile){
-      x.fillStyle=V.a;x.font='900 24px Arial';x.fillText('ПРЕДЛОЖЕНИЕ',70,by-18);
-      rr(55,by,970,bh,32,'rgba(255,255,255,.98)',null);x.strokeStyle=V.a+'38';x.lineWidth=2;x.stroke();
-      // When both blocks exist, give the denser block slightly more room; otherwise use the full panel.
-      let split=540;
-      if(hasCommercial&&hasProfile){const commercialWeight=(rub?2:0)+(meta.promo?2:0)+(meta.period?1:0);const profileWeight=profile.length+(hasAvatar?1:0);split=commercialWeight>profileWeight?575:(profileWeight>commercialWeight+1?500:540);x.strokeStyle='rgba(30,70,80,.14)';x.beginPath();x.moveTo(split,by+25);x.lineTo(split,by+bh-25);x.stroke()}
-
-      if(hasCommercial){
-        const lx=hasProfile?82:100,lw=hasProfile?(split-lx-30):880;
-        // Fixed editorial rhythm inside the commercial panel. All elements are positioned from the panel top,
-        // so a promotion can never push its period outside the card or leave an accidental large gap.
-        const label=commercial.find(it=>it.kind==='label');
-        const price=commercial.find(it=>it.kind==='price');
-        let cy=by+38;
-        if(label){x.fillStyle=V.a;x.font='800 27px Arial';x.fillText(label.text,lx,cy);cy+=48}
-        if(price){let fs=50;x.font=`900 ${fs}px Arial`;while(fs>31&&x.measureText(price.text).width>lw){fs--;x.font=`900 ${fs}px Arial`}x.fillStyle='#e85a00';x.fillText(price.text,lx,cy);cy+=24}
-        if(meta.promo){
-          const ph=94; cy+=12; rr(lx,cy,lw,ph,20,'#e51f3f',null);
-          x.save();x.strokeStyle='#fff';x.lineWidth=6;x.lineCap='round';x.lineJoin='round';const gx=lx+50,gy=cy+48;
-          x.strokeRect(gx-22,gy-9,44,31);x.beginPath();x.moveTo(gx,gy-9);x.lineTo(gx,gy+22);x.moveTo(gx-28,gy-9);x.lineTo(gx+28,gy-9);x.stroke();
-          x.beginPath();x.moveTo(gx-2,gy-11);x.bezierCurveTo(gx-28,gy-16,gx-23,gy-36,gx-5,gy-25);x.moveTo(gx+2,gy-11);x.bezierCurveTo(gx+28,gy-16,gx+23,gy-36,gx+5,gy-25);x.stroke();x.restore();
-          x.fillStyle='#fff';x.font='900 28px Arial';const pl=wrap(x,meta.promo,lw-116,2);let pyy=cy+(pl.length===1?57:40);for(const line of pl){x.fillText(line,lx+104,pyy);pyy+=31}cy+=ph+8;
-        } else { cy+=8; }
-        if(meta.period){x.fillStyle='#506C76';x.font='700 23px Arial';const lines=wrap(x,meta.period,lw,2);for(const line of lines){x.fillText(line,lx,cy+22);cy+=30}}
-      }
-
-      if(hasProfile){
-        const left=hasCommercial?split+34:105,right=hasCommercial?990:975;
-        let sx=left+(hasAvatar?112:0),avail=Math.max(150,right-sx);
-        const pm={status:{w:900,fs:23,min:16,lh:31,color:V.a,max:1},name:{w:900,fs:29,min:18,lh:37,color:'#102F36',max:1},phone:{w:700,fs:23,min:17,lh:31,color:'#294E58',max:1},contact:{w:700,fs:21,min:15,lh:29,color:'#294E58',max:2},address:{w:700,fs:20,min:15,lh:28,color:'#294E58',max:hasAvatar?3:3}};
-        let ph=0;const pdata=profile.map(it=>{const m=pm[it.kind];let fs=m.fs;x.font=`${m.w} ${fs}px Arial`;if(m.max===1){while(fs>m.min&&x.measureText(it.text).width>avail){fs--;x.font=`${m.w} ${fs}px Arial`}const lines=[it.text],h=m.lh;ph+=h+7;return {...it,m,fs,lines,h}}const lines=wrap(x,it.text,avail,m.max),h=Math.max(m.lh,lines.length*m.lh);ph+=h+7;return {...it,m,fs,lines,h}});if(ph)ph-=7;
-        let sy=by+Math.max(38,(bh-ph)/2)+18;
-        if(hasAvatar){await drawAvatar(x,meta.avatar,meta.crop,left+48,by+bh/2,48)}
-        for(const it of pdata){x.fillStyle=it.m.color;x.font=`${it.m.w} ${it.fs}px Arial`;for(const line of it.lines){x.fillText(line,sx,sy);sy+=it.m.lh}sy+=7}
-      }
+    // Measure and lay out both columns before painting any publication content.
+    x.fillStyle=V.a;x.font='900 24px Arial';x.fillText('ПРЕДЛОЖЕНИЕ',70,by-18);
+    rr(55,by,970,bh,32,'rgba(255,255,255,.98)',null);x.strokeStyle=V.a+'38';x.lineWidth=2;x.stroke();
+    if(publication.split){x.strokeStyle='rgba(30,70,80,.14)';x.beginPath();x.moveTo(publication.split,by+25);x.lineTo(publication.split,by+bh-25);x.stroke()}
+    if(hasCommercial)renderCommercial(x,publication.commercial,V.a);
+    if(hasProfile){
+      const layout=publication.profile;
+      if(hasAvatar)await drawAvatar(x,meta.avatar,meta.crop,layout.avatarX,by+bh/2,48);
+      for(const block of layout.blocks)renderPublicationText(x,block,layout.x,layout.y+block.top,block.kind==='status'?V.a:block.kind==='name'?'#102F36':'#294E58');
     }
     // footer
     x.strokeStyle='rgba(30,70,80,.18)';x.beginPath();x.moveTo(70,1880);x.lineTo(1010,1880);x.stroke();x.fillStyle=V.a;x.font='800 18px Arial';x.fillText('FUTURE HEALTH · SHARE HAPPINESS',70,1910);
@@ -183,17 +251,16 @@
     return [];
   }
   function getProduct(id){try{return products.find(p=>p.id===id)}catch{return null}}
-  function meaningful(cfg){
-    const commercial=cfg.priceMode!=='none'||!!cfg.showPV||!!String(cfg.promo||'').trim()||!!cfg.start||!!cfg.end;
-    const personal=(cfg.senderStatus&&cfg.senderStatus!=='none')||!!String(cfg.senderName||'').trim()||!!String(cfg.senderPhone||'').trim()||(cfg.senderContacts||[]).some(c=>String(c?.value||'').trim());
-    return {commercial,personal};
+  function meaningful(p,cfg){
+    const data=publicationData(p,cfg);
+    return {commercial:data.commercial.length>0,personal:data.profile.length>0||!!data.meta.avatar};
   }
   async function runPreview(btn){
     if(btn.dataset.fhBusy==='1')return;btn.dataset.fhBusy='1';const old=btn.textContent;btn.textContent='Создание…';
     const busy=document.createElement('div');busy.className='fhCoreBusy';busy.textContent='Создание предпросмотра…';document.body.appendChild(busy);
     try{
       const ids=idsFromConfig();if(!ids.length)throw new Error('Не удалось определить выбранный продукт');
-      const states=ids.map((id,i)=>meaningful(cfgForIndex(i,id)));if(states.every(v=>!v.commercial&&!v.personal))throw new Error('Добавьте данные отправителя и/или информацию о предложении перед созданием публикации');if(states.some(v=>v.commercial&&!v.personal))toast('Совет: добавьте данные отправителя, чтобы после пересылки покупатель понимал, к кому обратиться');
+      const states=ids.map((id,i)=>meaningful(getProduct(id),cfgForIndex(i,id)));if(states.some(v=>!v.commercial&&!v.personal))throw new Error('Добавьте данные отправителя и/или информацию о предложении перед созданием публикации');if(states.some(v=>v.commercial&&!v.personal))toast('Совет: добавьте данные отправителя, чтобы после пересылки покупатель понимал, к кому обратиться');
       const files=[];for(const id of ids){const p=getProduct(id);if(!p)continue;const cfg=cfgForIndex(files.length,id);const b=await card(p,files.length,cfg);files.push({url:URL.createObjectURL(b),blob:b,name:p.name})}
       if(!files.length)throw new Error('Карточка не создана');openPreview(files);
     }catch(e){console.error('[FH preview core]',e);toast(e?.message||'Ошибка создания предпросмотра')}
