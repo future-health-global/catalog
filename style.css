@@ -56,7 +56,7 @@
 html,body{height:100%;overscroll-behavior:none} body{overflow:hidden;background:#f7fbff}
 .top{position:fixed!important;top:0;left:0;right:0;height:var(--top-h);z-index:1000;background:rgba(255,255,255,.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .bottom{position:fixed!important;bottom:0;left:0;right:0;height:calc(var(--bottom-h) + env(safe-area-inset-bottom));z-index:1000;background:rgba(255,255,255,.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-#app{position:fixed;top:var(--top-h);bottom:calc(var(--bottom-h) + env(safe-area-inset-bottom));left:0;right:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+#app{scroll-behavior:auto;overflow-anchor:none;position:fixed;top:var(--top-h);bottom:calc(var(--bottom-h) + env(safe-area-inset-bottom));left:0;right:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
 body.reading #app{overflow:hidden}.readerHeader{position:absolute!important;top:0;left:0;right:0;z-index:25;background:rgba(255,255,255,.96)}
 .reader{position:absolute!important;top:58px;bottom:0;left:0;right:0;height:auto!important;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
 .readerPage{height:100%;overflow-y:auto!important;-webkit-overflow-scrolling:touch;scroll-snap-align:start;scroll-snap-stop:normal;padding-bottom:32px}
@@ -419,5 +419,9 @@ html,body{max-width:100%;overflow-x:hidden!important}
 .fh19NativeDate{position:absolute!important;right:0!important;top:0!important;width:48px!important;height:100%!important;min-height:44px!important;opacity:.001!important;pointer-events:auto!important;z-index:3!important;border:0!important;padding:0!important;margin:0!important}
 .shareAvatarPreview img{width:100%;height:100%;object-fit:cover;will-change:transform;transform-origin:center}
 
-html.fhNoSmooth,html.fhNoSmooth body{scroll-behavior:auto!important;}
 .calcControls button{touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+
+/* Independent information viewport; never inherits the app's scrolling state. */
+.infoPageViewport{position:fixed;z-index:40;top:var(--shell-top);bottom:calc(var(--shell-bottom) + env(safe-area-inset-bottom));left:0;right:0;background:#f7fbff;overflow-y:auto;overflow-x:hidden;scroll-behavior:auto;overflow-anchor:none;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+.infoPageNavigation{position:sticky;top:0;z-index:1;background:#f7fbff;padding:12px 14px}.infoPageNavigation button{padding:10px 12px;border-radius:12px;background:#eaf5ff;color:var(--blue);font-weight:700}
+@media(min-width:700px){.infoPageViewport{left:calc(50% - 260px);right:auto;width:520px}}
