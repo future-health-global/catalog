@@ -144,28 +144,20 @@
 
       if(hasCommercial){
         const lx=hasProfile?82:100,lw=hasProfile?(split-lx-30):880;
-        const normal=commercial.filter(it=>it.kind!=='promo');
-        const metrics={label:{font:'800 27px Arial',lh:46,max:1,color:V.a},price:{font:'900 50px Arial',lh:72,max:1,color:'#e85a00'},period:{font:'700 24px Arial',lh:38,max:2,color:'#506C76'}};
-        const measured=normal.map(it=>{const m=metrics[it.kind];x.font=m.font;let lines=wrap(x,it.text,lw,m.max);if(it.kind==='price')lines=[it.text];return {...it,m,lines,h:Math.max(m.lh,lines.length*m.lh)}});
-        const promoH=meta.promo?112:0;
-        let blockH=measured.reduce((a,it)=>a+it.h+14,0)+(promoH?promoH+16:0);if(blockH)blockH-=14;
-        let ly=by+Math.max(34,(bh-blockH)/2);
-        for(const it of measured){
-          x.fillStyle=it.m.color;x.font=it.m.font;
-          if(it.kind==='price'&&x.measureText(it.text).width>lw){let fs=46;while(fs>31&&x.measureText(it.text).width>lw){fs--;x.font=`900 ${fs}px Arial`}}
-          for(const line of it.lines){x.fillText(line,lx,ly);ly+=it.m.lh}ly+=14;
-          if(it.kind==='price'&&meta.promo){
-            const py=ly+4,ph=112;rr(lx,py,lw,ph,22,'#e51f3f',null);
-            // gift pictogram
-            x.save();x.strokeStyle='#fff';x.lineWidth=6;x.lineCap='round';x.lineJoin='round';const gx=lx+52,gy=py+56;
-            x.strokeRect(gx-24,gy-10,48,34);x.beginPath();x.moveTo(gx,gy-10);x.lineTo(gx,gy+24);x.moveTo(gx-30,gy-10);x.lineTo(gx+30,gy-10);x.stroke();
-            x.beginPath();x.moveTo(gx-2,gy-12);x.bezierCurveTo(gx-30,gy-17,gx-25,gy-40,gx-5,gy-27);x.moveTo(gx+2,gy-12);x.bezierCurveTo(gx+30,gy-17,gx+25,gy-40,gx+5,gy-27);x.stroke();x.restore();
-            x.fillStyle='#fff';x.font='900 29px Arial';const pl=wrap(x,meta.promo,lw-120,2);let pyy=py+(pl.length===1?67:48);for(const line of pl){x.fillText(line,lx+108,pyy);pyy+=34}ly=py+ph+18;
-          }
+        // Compact editorial flow: label -> price -> promotion -> period. No artificial vertical centering gaps.
+        let ly=by+42;
+        const label=commercial.find(it=>it.kind==='label');
+        const price=commercial.find(it=>it.kind==='price');
+        if(label){x.fillStyle=V.a;x.font='800 27px Arial';x.fillText(label.text,lx,ly);ly+=52}
+        if(price){let fs=50;x.font=`900 ${fs}px Arial`;while(fs>31&&x.measureText(price.text).width>lw){fs--;x.font=`900 ${fs}px Arial`}x.fillStyle='#e85a00';x.fillText(price.text,lx,ly);ly+=58}
+        if(meta.promo){
+          ly+=10;const ph=112;rr(lx,ly,lw,ph,22,'#e51f3f',null);
+          x.save();x.strokeStyle='#fff';x.lineWidth=6;x.lineCap='round';x.lineJoin='round';const gx=lx+52,gy=ly+56;
+          x.strokeRect(gx-24,gy-10,48,34);x.beginPath();x.moveTo(gx,gy-10);x.lineTo(gx,gy+24);x.moveTo(gx-30,gy-10);x.lineTo(gx+30,gy-10);x.stroke();
+          x.beginPath();x.moveTo(gx-2,gy-12);x.bezierCurveTo(gx-30,gy-17,gx-25,gy-40,gx-5,gy-27);x.moveTo(gx+2,gy-12);x.bezierCurveTo(gx+30,gy-17,gx+25,gy-40,gx+5,gy-27);x.stroke();x.restore();
+          x.fillStyle='#fff';x.font='900 29px Arial';const pl=wrap(x,meta.promo,lw-120,2);let pyy=ly+(pl.length===1?67:48);for(const line of pl){x.fillText(line,lx+108,pyy);pyy+=34}ly+=ph+12;
         }
-        if(meta.promo&&!rub){
-          const py=ly,ph=112;rr(lx,py,lw,ph,22,'#e51f3f',null);x.save();x.strokeStyle='#fff';x.lineWidth=6;const gx=lx+52,gy=py+56;x.strokeRect(gx-24,gy-10,48,34);x.beginPath();x.moveTo(gx,gy-10);x.lineTo(gx,gy+24);x.moveTo(gx-30,gy-10);x.lineTo(gx+30,gy-10);x.stroke();x.restore();x.fillStyle='#fff';x.font='900 29px Arial';const pl=wrap(x,meta.promo,lw-120,2);let pyy=py+(pl.length===1?67:48);for(const line of pl){x.fillText(line,lx+108,pyy);pyy+=34}
-        }
+        if(meta.period){x.fillStyle='#506C76';x.font='700 24px Arial';const lines=wrap(x,meta.period,lw,2);for(const line of lines){x.fillText(line,lx,ly+24);ly+=34}}
       }
 
       if(hasProfile){
