@@ -144,12 +144,28 @@
 
       if(hasCommercial){
         const lx=hasProfile?82:100,lw=hasProfile?(split-lx-30):880;
-        const metrics={label:{font:'800 27px Arial',lh:35,max:1,color:V.a},price:{font:'900 44px Arial',lh:51,max:1,color:'#102F36'},promo:{font:'800 29px Arial',lh:36,max:2,color:'#173D47'},period:{font:'700 24px Arial',lh:31,max:2,color:'#506C76'}};
-        let blockH=0;const measured=commercial.map(it=>{const m=metrics[it.kind];x.font=m.font;let lines=wrap(x,it.text,lw,m.max);if(it.kind==='price'&&lines.length>1)lines=[it.text];const h=Math.max(m.lh,lines.length*m.lh);blockH+=h+10;return {...it,m,lines,h}});if(blockH)blockH-=10;
-        let ly=by+Math.max(40,(bh-blockH)/2);
-        // Promotion gets a restrained gift badge; price remains the strongest visual element.
-        if(meta.promo){const gx=hasProfile?lx+lw-62:lx+lw-72,gy=by+48;x.save();x.fillStyle='#fff0f3';rr(gx-30,gy-30,60,60,16,'#fff0f3',null);x.strokeStyle='#e64c70';x.lineWidth=4;x.strokeRect(gx-18,gy-4,36,26);x.beginPath();x.moveTo(gx,gy-4);x.lineTo(gx,gy+22);x.moveTo(gx-23,gy-4);x.lineTo(gx+23,gy-4);x.stroke();x.beginPath();x.arc(gx-9,gy-15,9,Math.PI*.15,Math.PI*1.25);x.arc(gx+9,gy-15,9,Math.PI*-.25,Math.PI*.85);x.stroke();x.restore()}
-        for(const it of measured){x.fillStyle=it.m.color;x.font=it.m.font;if(it.kind==='price'&&x.measureText(it.text).width>lw){let fs=44;while(fs>31&&x.measureText(it.text).width>lw){fs--;x.font=`900 ${fs}px Arial`}}for(const line of it.lines){x.fillText(line,lx,ly);ly+=it.m.lh}ly+=10}
+        const normal=commercial.filter(it=>it.kind!=='promo');
+        const metrics={label:{font:'800 27px Arial',lh:40,max:1,color:V.a},price:{font:'900 46px Arial',lh:60,max:1,color:'#e85a00'},period:{font:'700 24px Arial',lh:34,max:2,color:'#506C76'}};
+        const measured=normal.map(it=>{const m=metrics[it.kind];x.font=m.font;let lines=wrap(x,it.text,lw,m.max);if(it.kind==='price')lines=[it.text];return {...it,m,lines,h:Math.max(m.lh,lines.length*m.lh)}});
+        const promoH=meta.promo?92:0;
+        let blockH=measured.reduce((a,it)=>a+it.h+14,0)+(promoH?promoH+16:0);if(blockH)blockH-=14;
+        let ly=by+Math.max(34,(bh-blockH)/2);
+        for(const it of measured){
+          x.fillStyle=it.m.color;x.font=it.m.font;
+          if(it.kind==='price'&&x.measureText(it.text).width>lw){let fs=46;while(fs>31&&x.measureText(it.text).width>lw){fs--;x.font=`900 ${fs}px Arial`}}
+          for(const line of it.lines){x.fillText(line,lx,ly);ly+=it.m.lh}ly+=14;
+          if(it.kind==='price'&&meta.promo){
+            const py=ly+2,ph=92;rr(lx,py,lw,ph,20,'#e51f3f',null);
+            // gift pictogram
+            x.save();x.strokeStyle='#fff';x.lineWidth=6;x.lineCap='round';x.lineJoin='round';const gx=lx+48,gy=py+46;
+            x.strokeRect(gx-24,gy-10,48,34);x.beginPath();x.moveTo(gx,gy-10);x.lineTo(gx,gy+24);x.moveTo(gx-30,gy-10);x.lineTo(gx+30,gy-10);x.stroke();
+            x.beginPath();x.moveTo(gx-2,gy-12);x.bezierCurveTo(gx-30,gy-17,gx-25,gy-40,gx-5,gy-27);x.moveTo(gx+2,gy-12);x.bezierCurveTo(gx+30,gy-17,gx+25,gy-40,gx+5,gy-27);x.stroke();x.restore();
+            x.fillStyle='#fff';x.font='900 27px Arial';const pl=wrap(x,meta.promo,lw-105,2);let pyy=py+(pl.length===1?56:38);for(const line of pl){x.fillText(line,lx+92,pyy);pyy+=31}ly=py+ph+16;
+          }
+        }
+        if(meta.promo&&!rub){
+          const py=ly,ph=92;rr(lx,py,lw,ph,20,'#e51f3f',null);x.save();x.strokeStyle='#fff';x.lineWidth=6;const gx=lx+48,gy=py+46;x.strokeRect(gx-24,gy-10,48,34);x.beginPath();x.moveTo(gx,gy-10);x.lineTo(gx,gy+24);x.moveTo(gx-30,gy-10);x.lineTo(gx+30,gy-10);x.stroke();x.restore();x.fillStyle='#fff';x.font='900 27px Arial';const pl=wrap(x,meta.promo,lw-105,2);let pyy=py+(pl.length===1?56:38);for(const line of pl){x.fillText(line,lx+92,pyy);pyy+=31}
+        }
       }
 
       if(hasProfile){
