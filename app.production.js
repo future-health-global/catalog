@@ -1,4 +1,4 @@
-window.FH_VERSION='38.0-RC5';
+window.FH_VERSION='38.0-RC6';
 const cats=[
 {id:'hits',ru:'Хит-продукты',en:'STAR PRODUCTS'},
 {id:'health',ru:'Серия для здоровья',en:'HEALTH SERIES'},
@@ -319,7 +319,7 @@ homeHtml=function(){let h=_homeHtmlRelease();h=h.replace('onclick="showOfficial(
 
 // Every true content switch starts from the top. This is deliberately not used for closing the image viewer.
 const _setViewRelease=setView;
-setView=function(html,state,push=true,tab=''){closeLayers();document.body.classList.remove('reading');const root=document.documentElement;root.classList.add('fhNoSmooth');root.scrollTop=0;document.body.scrollTop=0;window.scrollTo(0,0);if(app)app.scrollTop=0;if(push&&state)stack.push(state);app.innerHTML=html;if(tab)setActive(tab);root.scrollTop=0;document.body.scrollTop=0;window.scrollTo(0,0);if(app)app.scrollTop=0;void app.offsetHeight;root.classList.remove('fhNoSmooth')};
+setView=function(html,state,push=true,tab=''){closeLayers();document.body.classList.remove('reading');const root=document.documentElement;root.classList.add('fhNoSmooth');if(push&&state)stack.push(state);/* #app is the real scroller on mobile; freeze it during DOM replacement so Safari cannot restore the old scroll anchor. */const oldOverflow=app.style.overflowY;app.style.overflowY='hidden';app.scrollTop=0;app.innerHTML=html;if(tab)setActive(tab);app.scrollTop=0;void app.offsetHeight;requestAnimationFrame(()=>{app.scrollTop=0;app.style.overflowY=oldOverflow||'';app.scrollTop=0;root.classList.remove('fhNoSmooth')})};
 
 // Route support for the expanded company page.
 const _routeRelease=route;
