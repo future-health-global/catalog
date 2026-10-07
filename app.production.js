@@ -11,64 +11,13 @@ const cats=[
 const P=(id,cat,name,page,detail=null,img=null,sub='')=>({id,cat,name,page,detail,img,sub});
 const products=FULL_PRODUCTS;
 let stack=[]; const app=document.getElementById('app');
-const infoPages=[];
 const favKey='future-health-favorites-v7', recentKey='future-health-recent-v7', searchKey='future-health-search-v7';
 const getJSON=(k,d=[])=>{try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(d))}catch{return d}};
 const setJSON=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 function setActive(tab){document.querySelectorAll('.bottom button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab))}
-function closeLayers(keepInfo=false){if(!keepInfo)closeInfoPages();closeSearch();toggleMenu(false);if(typeof closeSeriesDrawer==='function')closeSeriesDrawer();document.getElementById('productShareShade')?.remove();}
-function setView(html,state,push=true,tab=''){
-  closeLayers();
-  document.body.classList.remove('reading');
-  if(push&&state)stack.push(state);
-  app.replaceChildren();
-  app.scrollTop=0;
-  app.innerHTML=html;
-  if(tab)setActive(tab);
-}
-// Information pages get a fresh scroll viewport. The underlying app and reader
-// remain mounted, so returning preserves their position without scroll resets.
-function openInfoPage(html,state,push=true){
-  closeLayers(true);
-  const viewport=document.createElement('section');
-  viewport.className='infoPageViewport';
-  viewport.dataset.page=state;
-  viewport.setAttribute('aria-label',state==='company'?'О компании':'Официальная информация');
-  viewport.innerHTML='<div class="infoPageNavigation"><button type="button" onclick="goBack()">← Назад</button></div>'+html;
-  const previous=infoPages.at(-1);
-  const stackDepth=stack.length;
-  if(push)stack.push(state);
-  document.body.appendChild(viewport);
-  if(previous){previous.viewport.style.visibility='hidden';previous.viewport.inert=true;}
-  infoPages.push({viewport,stackDepth});
-  viewport.addEventListener('scroll',()=>{if(viewport===infoPages.at(-1)?.viewport)document.getElementById('toTop')?.classList.toggle('show',viewport.scrollTop>500)},{passive:true});
-  app.inert=true;
-  document.getElementById('toTop')?.classList.remove('show');
-}
-function closeInfoPage(){
-  const current=infoPages.pop();
-  if(!current)return;
-  stack.length=current.stackDepth;
-  const previous=infoPages.at(-1);
-  if(previous){previous.viewport.style.visibility='';previous.viewport.inert=false;}
-  current.viewport.remove();
-  app.inert=infoPages.length>0;
-  const scroller=previous?.viewport||activePageScroller();
-  document.getElementById('toTop')?.classList.toggle('show',scroller.scrollTop>500);
-}
-function closeInfoPages(){
-  if(!infoPages.length)return;
-  stack.length=infoPages[0].stackDepth;
-  infoPages.forEach(({viewport})=>viewport.remove());
-  infoPages.length=0;
-  app.inert=false;
-}
-function activePageScroller(){
-  if(infoPages.length)return infoPages.at(-1).viewport;
-  const reader=document.getElementById('reader');
-  if(reader){const index=Math.round(reader.scrollLeft/Math.max(1,reader.clientWidth));return reader.children[index]||app}
-  return app;
-}
+function closeLayers(){closeSearch();toggleMenu(false);if(typeof closeSeriesDrawer==='function')closeSeriesDrawer();document.getElementById('productShareShade')?.remove();}
+function fhScrollTopAfterRender(){const reset=()=>{document.documentElement.scrollTop=0;document.body.scrollTop=0;window.scrollTo({top:0,left:0,behavior:'auto'});if(app)app.scrollTop=0};reset();requestAnimationFrame(reset)}
+function setView(html,state,push=true,tab=''){closeLayers();document.body.classList.remove('reading');const root=document.documentElement,prev=root.style.scrollBehavior;root.style.scrollBehavior='auto';window.scrollTo(0,0);document.body.scrollTop=0;root.scrollTop=0;if(app)app.scrollTop=0;if(push&&state)stack.push(state);app.innerHTML=html;if(tab)setActive(tab);window.scrollTo(0,0);document.body.scrollTop=0;root.scrollTop=0;if(app)app.scrollTop=0;requestAnimationFrame(()=>{window.scrollTo(0,0);document.body.scrollTop=0;root.scrollTop=0;if(app)app.scrollTop=0;root.style.scrollBehavior=prev||''})}
 function catCount(id){return products.filter(p=>p.cat===id).length}
 function catImg(id){return products.find(p=>p.cat===id&&p.img)?.img||''}
 function officialFooter(){return `<footer class="officialFooter"><button onclick="showOfficial()"><img src="assets/future-health-mark.png" alt=""><span><b>FUTURE HEALTH</b><small>Официальный каталог для российского рынка · RU 2026.10</small></span><i>›</i></button></footer>`}
@@ -82,10 +31,11 @@ function officialHtml(){return `<div class="officialPage">
 <section class="officialCard"><div class="cardTitle"><span>04</span><div><small>ДОКУМЕНТЫ</small><h2>Подтверждающие документы</h2></div></div><div class="docList"><div><i>▤</i><span><b>Авторизация российского направления</b><small>Добавить после утверждения / подписания</small></span></div><div><i>▤</i><span><b>Реквизиты российской компании</b><small>Добавить подтверждённые данные</small></span></div><div><i>↗</i><span><b>Официальная страница подтверждения</b><small>Подключить после публикации на сайте компании</small></span></div></div></section>
 <div class="officialNote"><b>Для согласования с компанией</b><p>Поля, отмеченные как ожидающие подтверждения, являются местами для официальных данных. Они не публикуются как фактические сведения до утверждения компанией.</p></div>
 </div>`}
-function showOfficial(push=true){openInfoPage(officialHtml()+officialFooter(),'official',push)}
+function showOfficial(push=true){document.body.classList.remove('reading');setView(officialHtml()+officialFooter(),'official',push,'')}
 function homeHtml(){return `<section class="homeHero"><div class="heroLogoLine"><img class="heroOfficialMark" src="assets/future-health-mark.png" alt=""><span>FUTURE HEALTH</span></div><div class="heroCatalog">КАТАЛОГ ПРОДУКЦИИ</div><div class="heroSlogan">ДЕЛИМСЯ СЧАСТЬЕМ</div><div class="heroWaves"><i></i><i></i></div></section><div class="wrap"><div id="cats" class="homeHeading"><h1>Категории продукции</h1><button onclick="openSearch()">⌕</button></div><div class="catTiles">${cats.map((c,i)=>`<button onclick="showCategory('${c.id}')"><span class="catPic">${catImg(c.id)?`<img src="${catImg(c.id)}">`:`<b>0${i+1}</b>`}</span><strong>${c.ru}</strong><small>${catCount(c.id)} продуктов</small><i>›</i></button>`).join('')}</div><section id="recent" class="recentBlock">${recentHtml()}</section><section id="about" class="aboutV7"><img src="assets/brand_p2_0.jpeg" alt="Liaoning Future Biotech"><div><small>LIAONING FUTURE BIOTECH CO., LTD.</small><h2>О компании</h2><p>Компания специализируется на разработке, производстве и реализации биологически активных добавок, пищевой продукции, косметики и товаров повседневного спроса.</p><p>У нас работает команда квалифицированных специалистов в области биотехнологий, а также имеется парк современного производственного оборудования.</p><button class="aboutOfficialBtn" onclick="showOfficial()">Официальная информация <i>›</i></button></div></section>${officialFooter()}</div>`}
 function recentHtml(){let ids=getJSON(recentKey).slice(0,6),ps=ids.map(id=>products.find(p=>p.id===id)).filter(Boolean);if(!ps.length)return '';return `<div class="blockTitle"><h2>Недавно просмотренные</h2></div><div class="recentRow">${ps.map(p=>`<button onclick="showProduct('${p.id}')">${p.img?`<img src="${p.img}">`:''}<span>${p.name}</span></button>`).join('')}</div>`}
 function goHome(push=true){document.body.classList.remove('reading');setView(homeHtml(),'home',push,'home')}
+function showHomeAbout(){goHome();const about=document.getElementById('about');if(about){document.documentElement.classList.add('fhNoSmooth');about.scrollIntoView({block:'start'});document.documentElement.classList.remove('fhNoSmooth')}}
 function showAll(push=true){document.body.classList.remove('reading');setView(`<div class="pageHead"><div><small>FUTURE HEALTH</small><h1>Каталог</h1><p>Выберите категорию продукции</p></div><button onclick="openSearch()">⌕</button></div><div class="catTiles catalogTiles">${cats.map((c,i)=>`<button onclick="showCategory('${c.id}')"><span class="catPic">${catImg(c.id)?`<img src="${catImg(c.id)}">`:`<b>0${i+1}</b>`}</span><strong>${c.ru}</strong><small>${catCount(c.id)} продуктов</small><i>›</i></button>`).join('')}</div>`,'all',push,'catalog')}
 function showCategory(id,push=true){document.body.classList.remove('reading');let c=cats.find(x=>x.id===id),ps=products.filter(p=>p.cat===id);setView(`<div class="categoryHead"><button onclick="showAll()">‹</button><div><h1>${c.ru}</h1><small>${ps.length} продуктов</small></div><button onclick="openSearch('${id}')">⌕</button></div><div class="filterRow"><button class="active">Все</button><button>Капсулы</button><button>Напитки</button><button>Таблетки</button></div>${gridHtml(ps)}`,`cat:${id}`,push,'catalog')}
 function gridHtml(ps){let fav=getJSON(favKey);return `<div class="productGrid">${ps.map((p,i)=>`<article><button class="heart ${fav.includes(p.id)?'on':''}" onclick="event.stopPropagation();toggleFav('${p.id}',this)">${fav.includes(p.id)?'♥':'♡'}</button><button class="productMain" onclick="showProduct('${p.id}')"><span class="gridPic">${p.img?`<img src="${p.img}">`:`<b>${String(i+1).padStart(2,'0')}</b>`}</span><strong>${p.name}</strong><i>›</i></button></article>`).join('')}</div>`}
@@ -103,9 +53,9 @@ function clearSearch(){let i=document.getElementById('searchInput');i.value='';r
 function renderSearch(q){let box=document.getElementById('searchResults'),inp=document.getElementById('searchInput'),cat=inp?.dataset.cat||'',s=q.trim().toLowerCase(),history=getJSON(searchKey);if(s.length<3){box.innerHTML=`<div class="searchHint">Введите не менее 3 символов для поиска</div>${history.length?`<div class="searchSection"><div><h3>Недавние запросы</h3><button onclick="setJSON(searchKey,[]);renderSearch('')">Очистить</button></div><div class="searchTags">${history.map(x=>`<button onclick="useSearch('${x.replaceAll("'","\\'")}')">${x}</button>`).join('')}</div></div>`:''}`;return}let ps=products.filter(p=>(!cat||p.cat===cat)&&p.name.toLowerCase().includes(s));box.innerHTML=`<div class="resultCount">Результаты (${ps.length})</div><div class="searchList">${ps.slice(0,30).map(p=>`<button onclick="saveSearch('${s.replaceAll("'","\\'")}');showProduct('${p.id}')">${p.img?`<img src="${p.img}">`:`<span></span>`}<b>${p.name}<small>${cats.find(c=>c.id===p.cat)?.ru||''}</small></b><i>›</i></button>`).join('')}</div>`}
 function saveSearch(s){let a=getJSON(searchKey).filter(x=>x!==s);a.unshift(s);setJSON(searchKey,a.slice(0,8))}
 function useSearch(s){let i=document.getElementById('searchInput');i.value=s;renderSearch(s)}
-function goBack(){if(infoPages.length)return closeInfoPage();stack.pop();const prev=stack.at(-1);if(!prev)return goHome(false);route(prev,false)}
-function route(s,push=false){document.body.classList.remove('reading');if(s==='home')goHome(push);else if(s==='all')showAll(push);else if(s==='favorites')showFavorites(push);else if(s==='official')showOfficial(push);else if(s==='company')showCompanyMore(push);else if(s==='calc')showCalculation(push);else if(s==='share')openShareCenter(push);else if(s.startsWith('cat:'))showCategory(s.slice(4),push);else if(s.startsWith('product:'))showProduct(s.slice(8),push)}
-function scrollTopNow(){activePageScroller().scrollTo({top:0,behavior:'smooth'})}
+function goBack(){let cur=stack.pop(),prev=stack.pop();if(!prev)return goHome(false);route(prev,false)}
+function route(s,push=false){document.body.classList.remove('reading');if(s==='home')goHome(push);else if(s==='all')showAll(push);else if(s==='favorites')showFavorites(push);else if(s==='official')showOfficial(push);else if(s.startsWith('cat:'))showCategory(s.slice(4),push);else if(s.startsWith('product:'))showProduct(s.slice(8),push)}
+function scrollTopNow(){let rp=document.querySelector('.readerPage');(rp||window).scrollTo?.({top:0,behavior:'smooth'});if(!rp)window.scrollTo({top:0,behavior:'smooth'})}
 document.getElementById('drawerCats').innerHTML=cats.map(c=>`<button onclick="showCategory('${c.id}')"><span>${c.ru}</span><small>${catCount(c.id)}</small><i>›</i></button>`).join('');
 window.addEventListener('scroll',()=>{let b=document.getElementById('toTop');if(b)b.classList.toggle('show',window.scrollY>500)});
 goHome(false);
@@ -127,6 +77,7 @@ function drawerProductName(name){return String(name||'').replace(/^\s*SUDOKU(?:�
 function openSeriesDrawer(cat,current){ensureSeriesDrawer();let c=cats.find(x=>x.id===cat),ps=products.filter(p=>p.cat===cat);document.getElementById('seriesDrawerTitle').textContent=c.ru;document.getElementById('seriesDrawerList').innerHTML=ps.map((p,i)=>{let im=cleanImg(p);return `<button class="${p.id===current?'active':''}" onclick="closeSeriesDrawer();showProduct('${p.id}')"><span class="seriesDrawerThumb">${im?`<img src="${im}" alt="">`:`<b>${String(i+1).padStart(2,'0')}</b>`}</span><span class="seriesDrawerText"><b>${drawerProductName(p.name)}</b><small>${c.ru}</small></span></button>`}).join('');document.getElementById('seriesDrawer').classList.add('open');document.getElementById('seriesShade').classList.add('open')}
 function closeSeriesDrawer(){document.getElementById('seriesDrawer')?.classList.remove('open');document.getElementById('seriesShade')?.classList.remove('open')}
 showProduct=function(id,push=true){let p=products.find(x=>x.id===id),c=cats.find(x=>x.id===p.cat),ps=products.filter(x=>x.cat===p.cat),idx=ps.findIndex(x=>x.id===id);addRecent(id);closeLayers();if(push)stack.push(`product:${id}`);app.innerHTML=`<div class="readerHeader"><button onclick="showCategory('${p.cat}')">‹</button><span>${c.ru}</span><button class="seriesMenuBtn" onclick="openSeriesDrawer('${p.cat}','${p.id}')">☰</button></div><div id="reader" class="reader">${ps.map((x,i)=>productPageHtml(x,c,i,ps.length)).join('')}</div>`;setActive('catalog');document.body.classList.add('reading');const r=document.getElementById('reader');requestAnimationFrame(()=>{r.scrollLeft=idx*r.clientWidth});let timer;r.addEventListener('scroll',()=>{clearTimeout(timer);timer=setTimeout(()=>{let i=Math.round(r.scrollLeft/r.clientWidth),cur=ps[i];if(cur){addRecent(cur.id);if(stack.length&&stack[stack.length-1].startsWith('product:'))stack[stack.length-1]=`product:${cur.id}`}},80)},{passive:true});r.querySelectorAll('.readerPage').forEach(pg=>pg.addEventListener('scroll',()=>{document.getElementById('toTop')?.classList.toggle('show',pg.scrollTop>450)},{passive:true}))};
+scrollTopNow=function(){let pg=document.querySelector('.readerPage');if(pg)pg.scrollTo({top:0,behavior:'smooth'});else app.scrollTo({top:0,behavior:'smooth'})};
 openScan=function(src){let ov=document.createElement('div');ov.className='scanViewer';ov.innerHTML=`<button class="scanClose">×</button><div class="scanStage"><img draggable="false" src="${src}"></div><div class="galleryDots">1 / 1</div>`;document.body.appendChild(ov);let im=ov.querySelector('img');im.oncontextmenu=e=>e.preventDefault();im.addEventListener('click',()=>ov.remove());ov.querySelector('.scanClose').onclick=()=>ov.remove()};
 document.addEventListener('contextmenu',e=>{if(e.target.closest('.productHero,.gridPic,.scanViewer'))e.preventDefault()});
 // left drawer: swipe left to close
@@ -271,6 +222,9 @@ function showCalculation(push=true){document.body.classList.remove('reading');co
 function calculationText(){const t=calcTotals();const lines=['FUTURE HEALTH — Предварительный расчёт',''];t.lines.forEach(({p,n,rub,pv})=>lines.push(`${shortCalcName(p.name)} × ${n} — ${Number(rub).toLocaleString('ru-RU')} ₽ / ${Number(pv).toLocaleString('ru-RU')} PV`));lines.push('',`Итого: ${Number(t.rub).toLocaleString('ru-RU')} ₽ / ${Number(t.pv).toLocaleString('ru-RU')} PV`,`Количество: ${t.qty} шт.`,'','Предварительный расчёт. Не является заказом или подтверждением покупки.');return lines.join('\n')}
 async function copyCalculation(){const text=calculationText();try{await navigator.clipboard.writeText(text);alert('Список скопирован')}catch{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();alert('Список скопирован')}}
 async function shareCalculation(){const text=calculationText();if(navigator.share){try{await navigator.share({title:'FUTURE HEALTH — Расчёт',text});return}catch(e){if(e?.name==='AbortError')return}}await copyCalculation()}
+// Route/back support for the new page.
+const _routeV23=route;
+route=function(s,push=false){if(s==='calc')showCalculation(push);else _routeV23(s,push)};
 updateCalcBadge();
 
 /* ===== V24: locked Расчёт UX refinement ===== */
@@ -358,11 +312,19 @@ function companyMoreHtml(){return `<div class="companyMorePage">
   <section class="companySection innovationSection"><div class="companySectionTitle"><span>05</span><div><small>ИННОВАЦИОННОЕ РАЗВИТИЕ</small><h2>От исследований к современному рынку</h2></div></div><img src="assets/innovation-wide.jpg" alt="Инновационное развитие"><p>Future Biotech связывает совершенствование потребительских преимуществ с внутренними и внешними ресурсами компании. Анализ данных и потребительских предпочтений используется при планировании производственных цепочек и сервисов.</p><p>В 2021 году компания объединила интернет-экономику совместного потребления с собственными научными разработками, запустив мобильное приложение и мини-программу для WeChat. Электронная торговая платформа объединила БАДы, пищевую продукцию, уход за кожей, декоративную косметику и товары повседневного спроса.</p></section>
   ${officialFooter()}
 </div>`}
-function showCompanyMore(push=true){openInfoPage(companyMoreHtml(),'company',push)}
+function showCompanyMore(push=true){document.body.classList.remove('reading');setView(companyMoreHtml(),'company',push,'home')}
 
 // Home keeps the already-approved limited sticky product zone, but the company CTA now opens the full company story.
 const _homeHtmlRelease=homeHtml;
 homeHtml=function(){let h=_homeHtmlRelease();h=h.replace('onclick="showOfficial()">Официальная информация <i>›</i>','onclick="showCompanyMore()">Узнать больше о компании <i>›</i>');return h};
+
+// Every true content switch starts from the top. This is deliberately not used for closing the image viewer.
+const _setViewRelease=setView;
+setView=function(html,state,push=true,tab=''){closeLayers();document.body.classList.remove('reading');const root=document.documentElement;root.classList.add('fhNoSmooth');root.scrollTop=0;document.body.scrollTop=0;window.scrollTo(0,0);if(app)app.scrollTop=0;if(push&&state)stack.push(state);app.innerHTML=html;if(tab)setActive(tab);root.scrollTop=0;document.body.scrollTop=0;window.scrollTo(0,0);if(app)app.scrollTop=0;void app.offsetHeight;root.classList.remove('fhNoSmooth')};
+
+// Route support for the expanded company page.
+const _routeRelease=route;
+route=function(s,push=false){if(s==='company')showCompanyMore(push);else _routeRelease(s,push)};
 
 // Fast quantity interaction: update the visible number first, persist immediately afterwards.
 function fastProductQty(id,d,ev){ev?.preventDefault?.();ev?.stopPropagation?.();const el=document.querySelector(`[data-product-qty="${id}"]`);const current=Math.max(0,Number(el?.textContent ?? productQty(id))||0);const n=Math.max(0,current+d);if(el)el.textContent=n;const c=getCalc();if(n===0)delete c[id];else c[id]=n;localStorage.setItem(calcKey,JSON.stringify(c));updateCalcBadge()}
@@ -485,14 +447,14 @@ companyMoreHtml=function(){return `<div class="companyMorePage v29Company">
 
 /* ===== V30 FINAL polish: gallery pan + active-position semantics ===== */
 
-function fastCalcQty(id,d,ev){ev?.preventDefault?.();ev?.stopPropagation?.();const el=document.querySelector(`[data-calc-qty="${id}"]`);const current=Math.max(0,Number(el?.textContent ?? getCalc()[id] ?? 0)||0);const n=Math.max(0,current+d);if(el)el.textContent=n;const c=getCalc();c[id]=n;localStorage.setItem(calcKey,JSON.stringify(c));const p=products.find(x=>x.id===id);document.querySelectorAll(`[data-calc-rub="${id}"]`).forEach(x=>x.textContent=Number((p?.priceRub||0)*n).toLocaleString('ru-RU')+' ₽');document.querySelectorAll(`[data-calc-pv="${id}"]`).forEach(x=>x.textContent=Number((p?.pv||0)*n).toLocaleString('ru-RU')+' PV');const t=calcTotalsV24();const q=document.querySelector('[data-calc-total-qty]'),r=document.querySelector('[data-calc-total-rub]'),v=document.querySelector('[data-calc-total-pv]');if(q)q.textContent=t.qty+' шт.';if(r)r.textContent=Number(t.rub).toLocaleString('ru-RU')+' ₽';if(v)v.textContent=Number(t.pv).toLocaleString('ru-RU')+' PV';updateCalcBadge()}
+function fastCalcQty(id,d,ev){ev?.preventDefault?.();ev?.stopPropagation?.();const el=document.querySelector(`[data-calc-qty="${id}"]`);const current=Math.max(0,Number(el?.textContent ?? getCalc()[id] ?? 0)||0);const n=Math.max(0,current+d);if(el)el.textContent=n;const c=getCalc();c[id]=n;localStorage.setItem(calcKey,JSON.stringify(c));const row=el?.closest('.calcItem');if(row)row.classList.toggle('zeroQty',n===0);const p=products.find(x=>x.id===id);document.querySelectorAll(`[data-calc-rub="${id}"]`).forEach(x=>x.textContent=Number((p?.priceRub||0)*n).toLocaleString('ru-RU')+' ₽');document.querySelectorAll(`[data-calc-pv="${id}"]`).forEach(x=>x.textContent=Number((p?.pv||0)*n).toLocaleString('ru-RU')+' PV');const t=calcTotalsV24();const q=document.querySelector('[data-calc-total-qty]'),r=document.querySelector('[data-calc-total-rub]'),v=document.querySelector('[data-calc-total-pv]'),pos=document.querySelector('[data-calc-positions]');if(q)q.textContent=t.qty+' шт.';if(r)r.textContent=Number(t.rub).toLocaleString('ru-RU')+' ₽';if(v)v.textContent=Number(t.pv).toLocaleString('ru-RU')+' PV';if(pos)pos.textContent=t.lines.filter(x=>x.n>0).length;updateCalcBadge()}
 
 // Расчёт: zero-quantity rows remain as a reversible draft state, but are not active positions.
 showCalculation=function(push=true){
   document.body.classList.remove('reading');
   const t=calcTotals(), activePositions=t.lines.filter(x=>x.n>0).length;
   const rows=t.lines.map(({p,n,rub,pv})=>`<article class="calcItem ${n===0?'zeroQty':''}"><button class="calcProduct" onclick="showProduct('${p.id}')"><span>${p.img?`<img src="${p.img}" alt="">`:''}</span><div><b>${shortCalcName(p.name)}</b><small>${Number(p.priceRub).toLocaleString('ru-RU')} ₽ · ${Number(p.pv).toLocaleString('ru-RU')} PV / шт.</small></div></button><div class="calcControls"><button onpointerdown="fastCalcQty('${p.id}',-1,event)">−</button><strong data-calc-qty="${p.id}">${n}</strong><button onpointerdown="fastCalcQty('${p.id}',1,event)">+</button><span><b data-calc-rub="${p.id}">${Number(rub).toLocaleString('ru-RU')} ₽</b><small data-calc-pv="${p.id}">${Number(pv).toLocaleString('ru-RU')} PV</small></span><button class="calcRemove" onclick="removeCalc('${p.id}')" aria-label="Удалить">×</button></div></article>`).join('');
-  const html=`<div class="calcPage"><div class="calcHead"><div><small>FUTURE HEALTH</small><h1>Расчёт</h1><p>Предварительный список продуктов перед покупкой</p></div>${t.lines.length?`<button onclick="clearCalculation()">Очистить</button>`:''}</div>${rows||`<div class="emptyState calcEmpty"><span class="bigCalculator">⌗</span><h2>Список пока пуст</h2><p>Укажите количество прямо на странице продукта.</p><button onclick="showAll()">Открыть каталог</button></div>`}${t.lines.length?`<section class="calcSummary"><div><span>Позиций</span><b>${activePositions}</b></div><div><span>Количество</span><b data-calc-total-qty>${t.qty} шт.</b></div><div class="calcGrand"><span>Итого</span><b data-calc-total-rub>${Number(t.rub).toLocaleString('ru-RU')} ₽</b><strong data-calc-total-pv>${Number(t.pv).toLocaleString('ru-RU')} PV</strong></div><p>Предварительный расчёт. Не является заказом или подтверждением покупки.</p><div class="calcActions"><button onclick="shareCalculation()">↗ Поделиться</button><button onclick="copyCalculation()">▤ Скопировать</button></div></section>`:''}</div>`;
+  const html=`<div class="calcPage"><div class="calcHead"><div><small>FUTURE HEALTH</small><h1>Расчёт</h1><p>Предварительный список продуктов перед покупкой</p></div>${t.lines.length?`<button onclick="clearCalculation()">Очистить</button>`:''}</div>${rows||`<div class="emptyState calcEmpty"><span class="bigCalculator">⌗</span><h2>Список пока пуст</h2><p>Укажите количество прямо на странице продукта.</p><button onclick="showAll()">Открыть каталог</button></div>`}${t.lines.length?`<section class="calcSummary"><div><span>Позиций</span><b data-calc-positions>${activePositions}</b></div><div><span>Количество</span><b data-calc-total-qty>${t.qty} шт.</b></div><div class="calcGrand"><span>Итого</span><b data-calc-total-rub>${Number(t.rub).toLocaleString('ru-RU')} ₽</b><strong data-calc-total-pv>${Number(t.pv).toLocaleString('ru-RU')} PV</strong></div><p>Предварительный расчёт. Не является заказом или подтверждением покупки.</p><div class="calcActions"><button onclick="shareCalculation()">↗ Поделиться</button><button onclick="copyCalculation()">▤ Скопировать</button></div></section>`:''}</div>`;
   setView(html,'calc',push,'calc');updateCalcBadge();
 };
 
@@ -879,7 +841,7 @@ readBatchConfigs=function(){const a=_readBatchConfigs357();const t=document.getE
 const _persistShareDefaults357=persistShareDefaults;
 persistShareDefaults=function(cfg){_persistShareDefaults357(cfg);if(!cfg?.saveDefaults)return;const p=loadSharePrefs();saveSharePrefs({...p,template:cfg.template||'classic',showQR:cfg.showQR!==false,avatar:cfg.avatar||''})}
 
-function openShareCenter(push=true){setView(`<section class="shareCenterHero"><small style="color:#1268ad;font-weight:800;letter-spacing:.1em">FUTURE HEALTH</small><h1>Центр публикаций</h1><p>Создавайте фирменные карточки продуктов и отправляйте до пяти продуктов за один раз.</p></section><section class="shareCenterActions"><button class="shareCenterCard" onclick="openShareProfileSettings()"><i>◉</i><span><b>Мои данные для публикаций</b><small>Имя, статус, телефон, дополнительные контакты и фото.</small></span><em>›</em></button><button class="shareCenterCard" onclick="openShareCenterPicker(1)"><i>▧</i><span><b>Поделиться продуктами</b><small>Выберите от 1 до 5 продуктов, настройте оформление и просмотрите карточки перед отправкой.</small></span><em>›</em></button></section>`,'share',push,'share')}
+function openShareCenter(){document.body.classList.remove('reading');document.getElementById('app').innerHTML=`<section class="shareCenterHero"><small style="color:#1268ad;font-weight:800;letter-spacing:.1em">FUTURE HEALTH</small><h1>Центр публикаций</h1><p>Создавайте фирменные карточки продуктов и отправляйте до пяти продуктов за один раз.</p></section><section class="shareCenterActions"><button class="shareCenterCard" onclick="openShareCenterPicker(1)"><i>▧</i><span><b>Поделиться продуктами</b><small>Выберите от 1 до 5 продуктов, настройте оформление и просмотрите карточки перед отправкой.</small></span><em>›</em></button><button class="shareCenterCard" onclick="openShareProfileSettings()"><i>◉</i><span><b>Мои данные для публикаций</b><small>Имя, статус, телефон, дополнительные контакты и фото.</small></span><em>›</em></button></section>`;setActive('share');window.scrollTo(0,0)}
 function openShareCenterPicker(){batchSelected=[];const d=document.createElement('div');d.id='batchShareShade';d.className='shareConfigShade';d.innerHTML=`<div class="shareConfigSheet batchPicker"><div class="shareConfigHead"><div><small>FUTURE HEALTH</small><b>Выберите 1–5 продуктов</b></div><button onclick="closeBatchPicker()">×</button></div><input id="batchSearch" class="shareInput" placeholder="Поиск продукта" oninput="renderBatchProducts(this.value)"><div class="batchCounter"><b id="batchCount">0</b> / 5</div><div id="batchProducts" class="batchProducts"></div><div class="shareConfigActions"><button class="secondary" onclick="closeBatchPicker()">Отмена</button><button class="primary" onclick="shareCenterContinue()">Продолжить</button></div></div>`;document.body.appendChild(d);renderBatchProducts('')}
 function shareCenterContinue(){if(!batchSelected.length){showShareToast('Выберите продукт','Можно выбрать от 1 до 5 продуктов');return}openBatchConfig()}
 function openShareProfileSettings(){const pref=shareBasePrefs();const d=document.createElement('div');d.id='shareConfigShade';d.className='shareConfigShade';d.innerHTML=`<div class="shareConfigSheet"><div class="shareConfigHead"><div><small>FUTURE HEALTH</small><b>Мои данные</b></div><button onclick="closeShareConfig()">×</button></div>${senderFieldsHtml(pref)}${shareVisualFieldsHtml(pref)}<div class="shareConfigActions"><button class="secondary" onclick="closeShareConfig()">Отмена</button><button class="primary" onclick="saveShareProfileOnly()">Сохранить</button></div></div>`;document.body.appendChild(d);bindShareInputs(d);bindAvatar(d);const cb=d.querySelector('#shareSaveDefaults');if(cb){cb.checked=true;cb.closest('label').style.display='none'}}
@@ -1012,6 +974,7 @@ window.fh16SyncQr=()=>{const q=document.getElementById('shareQR');if(!q)return;c
 window.rowHtml=function rowHtml(p){return `<div class="batchCfgRow shareField" data-id="${p.id}"><div class="batchCfgHead">${p.img?`<img src="${p.img}" alt="">`:''}<b>${p.name}</b></div>${priceControls()}${promoControls()}</div>`}
 
 // Publication center order: profile first, products second.
+window.openShareCenter=function(){closeSearch();toggleMenu(false);closeSeriesDrawer();document.body.classList.remove('reading');document.getElementById('app').innerHTML=`<section class="shareCenterHero"><small style="color:#1268ad;font-weight:800;letter-spacing:.1em">FUTURE HEALTH</small><h1>Центр публикаций</h1><p>Создавайте фирменные карточки продуктов и отправляйте до пяти продуктов за один раз.</p></section><section class="shareCenterActions"><button class="shareCenterCard" onclick="openShareProfileSettings()"><i>◉</i><span><b>Мои данные для публикаций</b><small>Имя, статус, телефон, дополнительные контакты и фото.</small></span><em>›</em></button><button class="shareCenterCard" onclick="openShareCenterPicker(1)"><i>▧</i><span><b>Поделиться продуктами</b><small>Выберите от 1 до 5 продуктов, настройте оформление и просмотрите карточки перед отправкой.</small></span><em>›</em></button></section>`;setActive('share');window.scrollTo(0,0)};
 
 // Profile owns contacts + avatar only. Hidden markers prevent automatic color/QR injectors from adding duplicate controls.
 const oldProfile=window.openShareProfileSettings;window.openShareProfileSettings=function(){oldProfile();const sh=document.querySelector('#shareConfigShade .shareConfigSheet');if(!sh)return;sh.insertAdjacentHTML('beforeend','<input type="hidden" id="shareColor" value="profile"><input type="hidden" id="shareQR">');sh.querySelectorAll('.fhColorBlock,.fhSeriesBlock,.fhQrBlock').forEach(e=>e.remove())};
@@ -1118,3 +1081,6 @@ window.showCategory=function(id,push=true){
   function revealActive(){requestAnimationFrame(()=>requestAnimationFrame(()=>{const row=document.querySelector('.categoryQuick'),a=row?.querySelector('button.active');if(!row||!a)return;const target=a.offsetLeft-(row.clientWidth-a.offsetWidth)/2;row.scrollTo({left:Math.max(0,target),behavior:'auto'})}))}
   const oldShow=window.showCategory;window.showCategory=function(id,push=true){oldShow(id,push);revealActive()};
 })();
+
+/* V38 RC2 production stabilization: informational pages always start at top after render. */
+// RC4: top reset is handled atomically inside setView; no late scroll wrappers.
