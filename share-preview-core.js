@@ -129,16 +129,20 @@
       x.fillStyle='#102F36';x.font='900 31px Arial';x.fillText(`${rub} ₽${pv}`,lx,ly);ly+=44;
     } else if(cfg.showPV&&cfg.priceMode!=='none'&&productObj.pv){x.fillStyle='#102F36';x.font='900 30px Arial';x.fillText(`${Number(productObj.pv).toLocaleString('ru-RU')} PV`,lx,ly);ly+=42}
     if(meta.promo){x.fillStyle='#173D47';x.font='800 23px Arial';ly=drawWrapped(x,meta.promo,lx,ly+4,lw,29,2)}
-    if(meta.period){x.fillStyle='#506C76';x.font='700 19px Arial';drawWrapped(x,meta.period,lx,ly+8,lw,25,1)}
+    if(meta.period){x.fillStyle='#506C76';x.font='700 19px Arial';drawWrapped(x,meta.period,lx,ly+8,lw,25,2)}
 
-    // RIGHT 50% — identity. Avatar/name/phone never move left when commercial fields are empty.
-    const rx=570,rw=420;let sx=meta.avatar?570:592,sy=by+58;
-    // QR lives in the upper-right corner, has no caption, and is forced off for custom price.
+    // RIGHT 50% — identity. No hard-coded status: render exactly the status selected by the sender.
+    const rx=570,rw=420;let sx=592,sy=by+58;
     const showQr=meta.qr && cfg.priceMode!=='custom';
     if(showQr){let url='';try{url=productDeepLink(p.id)}catch{};x.save();x.globalAlpha=.97;rr(842,96,176,176,18,'rgba(255,255,255,.98)',null);qrDraw(x,url,856,110,148);x.restore()}
-    if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,625,by+88,48);if(ok)sx=690}else{sx=592}
-    x.fillStyle=V.a;x.font='900 19px Arial';x.fillText('ВАШ КОНСУЛЬТАНТ',sx,sy);sy+=39;
-    if(meta.sender.length){meta.sender.slice(0,5).forEach((v,i)=>{x.fillStyle=i===0?'#102F36':'#294E58';x.font=`${i===0?'900':'700'} ${i===0?27:21}px Arial`;sy=drawWrapped(x,v,sx,sy,showQr?185:300,28,2)})}
+    if(meta.avatar){const ok=await drawAvatar(x,meta.avatar,meta.crop,625,by+88,48);if(ok)sx=690}
+    const textRight=990, avail=Math.max(120,textRight-sx);
+    function oneLine(text,weight,size,minSize,color){if(!text)return;let fs=size;x.fillStyle=color;while(fs>minSize){x.font=`${weight} ${fs}px Arial`;if(x.measureText(text).width<=avail)break;fs-=1}x.fillText(text,sx,sy);sy+=fs+11}
+    const status=typeof senderStatusLabel==='function'?senderStatusLabel(cfg.senderStatus):'';
+    oneLine(status?status.toUpperCase():'',900,21,15,V.a);
+    oneLine(String(cfg.senderName||''),900,27,18,'#102F36');
+    oneLine(String(cfg.senderPhone||''),700,21,17,'#294E58');
+    (cfg.senderContacts||[]).slice(0,2).forEach(c=>{if(!c?.value)return;const line=`${c.type}: ${String(c.value).trim()}`;x.fillStyle='#294E58';x.font='700 19px Arial';const isAddr=String(c.type).toLowerCase().includes('адрес');if(isAddr)sy=drawWrapped(x,line,sx,sy,avail,25,meta.avatar?3:2);else {let fs=19;while(fs>15){x.font=`700 ${fs}px Arial`;if(x.measureText(line).width<=avail)break;fs--}if(x.measureText(line).width<=avail){x.fillText(line,sx,sy);sy+=fs+9}else sy=drawWrapped(x,line,sx,sy,avail,24,2)}});
     // footer
     x.strokeStyle='rgba(30,70,80,.18)';x.beginPath();x.moveTo(70,1880);x.lineTo(1010,1880);x.stroke();x.fillStyle=V.a;x.font='800 18px Arial';x.fillText('FUTURE HEALTH · SHARE HAPPINESS',70,1910);
     return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('canvas blob')),'image/png'));
